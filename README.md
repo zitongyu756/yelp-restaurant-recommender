@@ -71,7 +71,7 @@ yelp-restaurant-recommender/
 ### 1. Clone the repo
 
 ```bash
-git clone [https://github.com/<your-team>/yelp-restaurant-recommender.git](https://github.com/zitongyu756/yelp-restaurant-recommender.git)
+git clone https://github.com/zitongyu756/yelp-restaurant-recommender.git
 cd yelp-restaurant-recommender
 ```
 
