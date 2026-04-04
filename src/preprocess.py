@@ -18,10 +18,12 @@ from pathlib import Path
 
 from src.config import (
     BUSINESS_JSON,
-    NYC_RESTAURANTS_CSV,
-    NYC_CITY_VALUES,
+    PHILLY_RESTAURANTS_CSV,
+    TARGET_CITY_VALUES,
+    TARGET_STATE_VALUE,
     RESTAURANT_CATEGORY_KEYWORDS,
     MIN_REVIEW_COUNT,
+    REQUIRE_IS_OPEN,
 )
 from src.utils import get_logger, save_csv
 
@@ -44,16 +46,18 @@ def load_business_json(path: Path) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def is_nyc(city: str) -> bool:
-    """Return True if the city value matches a known NYC identifier."""
-    return str(city).strip() in NYC_CITY_VALUES
+def is_target_area(city: str, state: str) -> bool:
+    """Return True if the city and state match Philadelphia, PA."""
+    return str(city).strip() in TARGET_CITY_VALUES and str(state).strip() == TARGET_STATE_VALUE
 
 
 def is_restaurant(categories: str) -> bool:
     """Return True if any restaurant-related keyword appears in the categories string."""
     if not isinstance(categories, str):
         return False
-    return any(kw in categories for kw in RESTAURANT_CATEGORY_KEYWORDS)
+    # Use case-insensitive matching for robustness
+    cats_lower = categories.lower()
+    return any(kw.lower() in cats_lower for kw in RESTAURANT_CATEGORY_KEYWORDS)
 
 
 def extract_attributes(attributes: dict | None) -> dict:
@@ -84,24 +88,30 @@ def extract_attributes(attributes: dict | None) -> dict:
     }
 
 
-def filter_nyc_restaurants(df: pd.DataFrame) -> pd.DataFrame:
+def filter_philly_restaurants(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Apply all filters and return a clean DataFrame of NYC restaurants.
+    Apply all filters and return a clean DataFrame of Philadelphia restaurants.
 
     Filters applied:
-      1. City must be in NYC_CITY_VALUES
+      1. City/State must match Philadelphia, PA
       2. Categories must contain a restaurant keyword
       3. review_count >= MIN_REVIEW_COUNT
-      4. stars must be non-null
+      4. is_open == 1 (if REQUIRE_IS_OPEN is True)
+      5. stars must be non-null
     """
-    # Filter by city
-    nyc_mask = df["city"].apply(is_nyc)
-    df_nyc = df[nyc_mask].copy()
-    logger.info("After NYC city filter: %d businesses", len(df_nyc))
+    # Filter by city and state
+    area_mask = df.apply(lambda x: is_target_area(x["city"], x["state"]), axis=1)
+    df_philly = df[area_mask].copy()
+    logger.info("After Philadelphia city/state filter: %d businesses", len(df_philly))
+
+    # Filter by is_open
+    if REQUIRE_IS_OPEN:
+        df_philly = df_philly[df_philly["is_open"] == 1].copy()
+        logger.info("After is_open filter: %d businesses", len(df_philly))
 
     # Filter by category
-    rest_mask = df_nyc["categories"].apply(is_restaurant)
-    df_rest = df_nyc[rest_mask].copy()
+    rest_mask = df_philly["categories"].apply(is_restaurant)
+    df_rest = df_philly[rest_mask].copy()
     logger.info("After restaurant category filter: %d businesses", len(df_rest))
 
     # Filter by minimum review count
@@ -144,6 +154,7 @@ def build_output_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "address",
         "stars",
         "review_count",
+        "is_open",
         "categories",
         "price_range",
         "attributes_wifi",
@@ -161,20 +172,20 @@ def build_output_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return df[columns].reset_index(drop=True)
 
 
-def run(business_json: Path = BUSINESS_JSON, output_csv: Path = NYC_RESTAURANTS_CSV) -> pd.DataFrame:
+def run(business_json: Path = BUSINESS_JSON, output_csv: Path = PHILLY_RESTAURANTS_CSV) -> pd.DataFrame:
     """
     Full preprocessing pipeline.
-    Reads raw Yelp business data and writes the NYC restaurant CSV.
+    Reads raw Yelp business data and writes the Philadelphia restaurant CSV.
     Returns the resulting DataFrame.
     """
     logger.info("Starting preprocessing...")
 
     df_raw = load_business_json(business_json)
-    df_filtered = filter_nyc_restaurants(df_raw)
+    df_filtered = filter_philly_restaurants(df_raw)
     df_output = build_output_dataframe(df_filtered)
 
     save_csv(df_output, output_csv)
-    logger.info("Saved %d NYC restaurants to %s", len(df_output), output_csv)
+    logger.info("Saved %d Philadelphia restaurants to %s", len(df_output), output_csv)
 
     return df_output
 

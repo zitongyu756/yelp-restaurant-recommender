@@ -5,6 +5,11 @@ numpy>=1.26
 # Sentence embeddings
 sentence-transformers>=2.7
 
+# Analysis and Plotting
+matplotlib>=3.8
+seaborn>=0.13
+jupyter>=1.0
+
 # Web app
 streamlit>=1.35
 

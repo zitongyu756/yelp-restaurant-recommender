@@ -30,24 +30,19 @@ REVIEW_JSON    = RAW_DIR / "yelp_academic_dataset_review.json"
 # ---------------------------------------------------------------------------
 # Intermediate / processed output files
 # ---------------------------------------------------------------------------
-NYC_RESTAURANTS_CSV    = INTERIM_DIR / "nyc_restaurants.csv"
+PHILLY_RESTAURANTS_CSV = PROCESSED_DIR / "philly_restaurants.csv"
+PHILLY_REVIEWS_CSV     = PROCESSED_DIR / "philly_reviews.csv"
 PROFILES_CSV           = PROCESSED_DIR / "restaurant_profiles.csv"
 EMBEDDINGS_NPY         = PROCESSED_DIR / "embeddings.npy"
 
 # ---------------------------------------------------------------------------
-# NYC filter settings
+# Target filtering settings (Philadelphia, PA)
 # ---------------------------------------------------------------------------
-# Yelp stores city as a free-text string.  We accept any of the values below.
-NYC_CITY_VALUES = {
-    "New York",
-    "New York City",
-    "Manhattan",
-    "Brooklyn",
-    "Queens",
-    "Bronx",
-    "Staten Island",
-    "The Bronx",
+# Yelp stores city as a free-text string. We accept the values below.
+TARGET_CITY_VALUES = {
+    "Philadelphia",
 }
+TARGET_STATE_VALUE = "PA"
 
 # Yelp categories to treat as "restaurant / food" businesses
 RESTAURANT_CATEGORY_KEYWORDS = [
@@ -57,10 +52,18 @@ RESTAURANT_CATEGORY_KEYWORDS = [
     "Nightlife",
     "Coffee",
     "Cafes",
+    "Bakery",
+    "Diners",
 ]
 
 # Minimum number of reviews a restaurant must have to be included
-MIN_REVIEW_COUNT = 10
+MIN_REVIEW_COUNT = 20 
+
+# Must be currently open
+REQUIRE_IS_OPEN = True
+
+# Review recency filter
+START_YEAR = 2019
 
 # ---------------------------------------------------------------------------
 # Profile builder settings
