@@ -1,16 +1,17 @@
 """
 run_build_profiles.py
 ---------------------
-Offline script: Build one searchable text profile per NYC restaurant.
+Offline script: build one searchable text profile per Philadelphia restaurant.
 
-Must be run AFTER run_preprocess.py.
+Must be run AFTER run_preprocess.py (which produces philly_restaurants.csv
+and philly_reviews.csv).
 
 Usage:
     python scripts/run_build_profiles.py
 
 Input:
-    data/interim/nyc_restaurants.csv
-    data/raw/yelp_academic_dataset_review.json  (optional but recommended)
+    data/processed/philly_restaurants.csv
+    data/processed/philly_reviews.csv
 
 Output:
     data/processed/restaurant_profiles.csv
@@ -22,32 +23,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import build_profiles
-from src.config import NYC_RESTAURANTS_CSV, REVIEW_JSON, PROFILES_CSV
+from src.config import PHILLY_RESTAURANTS_CSV, PHILLY_REVIEWS_CSV, PROFILES_CSV
 from src.utils import get_logger
 
 logger = get_logger("run_build_profiles")
 
 
 def main():
-    if not NYC_RESTAURANTS_CSV.exists():
+    if not PHILLY_RESTAURANTS_CSV.exists():
         logger.error(
-            "Interim file not found: %s\n"
+            "Restaurants file not found: %s\n"
             "Run scripts/run_preprocess.py first.",
-            NYC_RESTAURANTS_CSV,
+            PHILLY_RESTAURANTS_CSV,
         )
         sys.exit(1)
 
-    if not REVIEW_JSON.exists():
+    if not PHILLY_REVIEWS_CSV.exists():
         logger.warning(
-            "Review file not found at %s. Profiles will be built from metadata only.\n"
-            "This is fine for testing, but results will be less rich.",
-            REVIEW_JSON,
+            "Reviews file not found at %s.\n"
+            "Profiles will be built from metadata only (less rich results).",
+            PHILLY_REVIEWS_CSV,
         )
 
     logger.info("=== Step 2: Building restaurant profiles ===")
     df = build_profiles.run(
-        restaurants_csv=NYC_RESTAURANTS_CSV,
-        review_json=REVIEW_JSON,
+        restaurants_csv=PHILLY_RESTAURANTS_CSV,
+        reviews_csv=PHILLY_REVIEWS_CSV,
         output_csv=PROFILES_CSV,
     )
     logger.info("Done. %d profiles saved to %s", len(df), PROFILES_CSV)

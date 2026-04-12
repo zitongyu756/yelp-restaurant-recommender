@@ -1,29 +1,34 @@
 """
 build_profiles.py
 -----------------
-Builds a single searchable text "profile" for each NYC restaurant by combining:
-  - Structured metadata: name, cuisine, city, neighborhood, price, rating
-  - Selected attributes: WiFi, noise level, ambience
-  - Sampled review text from real customers
+Builds a single searchable text "profile" for each Philadelphia restaurant
+by combining structured metadata with sampled customer review text.
+
+What goes into a profile:
+  - Name and cuisine categories
+  - Address and city (neighborhood is blank for most Philly entries)
+  - Star rating and price tier
+  - Selected attributes: WiFi, noise level, ambience (True keys only)
+  - Up to MAX_REVIEWS_PER_RESTAURANT review snippets (first N in the CSV)
 
 Input:
-  data/interim/nyc_restaurants.csv
-  data/raw/yelp_academic_dataset_review.json (streamed line by line)
+  data/processed/philly_restaurants.csv   (from run_preprocess.py)
+  data/processed/philly_reviews.csv       (from run_preprocess.py)
 
 Output:
   data/processed/restaurant_profiles.csv
-  Columns: business_id, name, stars, review_count, price_range, profile_text
+  Columns: business_id, name, stars, review_count, price_range,
+           city, address, categories, profile_text
 """
 
-import json
-from collections import defaultdict
+import ast
 from pathlib import Path
 
 import pandas as pd
 
 from src.config import (
-    NYC_RESTAURANTS_CSV,
-    REVIEW_JSON,
+    PHILLY_RESTAURANTS_CSV,
+    PHILLY_REVIEWS_CSV,
     PROFILES_CSV,
     MAX_REVIEWS_PER_RESTAURANT,
 )
@@ -31,129 +36,207 @@ from src.utils import get_logger, load_csv, save_csv
 
 logger = get_logger(__name__)
 
+# Maximum characters to keep from each individual review snippet.
+# Sentence-transformers truncate at ~256 tokens anyway; keeping snippets
+# short prevents one verbose review from drowning out the others.
+MAX_REVIEW_CHARS = 300
 
-def load_reviews_for_businesses(
-    review_json: Path, business_ids: set, max_per_business: int
-) -> dict[str, list[str]]:
+
+# ---------------------------------------------------------------------------
+# Attribute cleaning helpers
+# ---------------------------------------------------------------------------
+
+def clean_attr_value(val) -> str:
     """
-    Stream through the Yelp review JSON and collect up to `max_per_business`
-    review texts for each business_id in `business_ids`.
+    Strip Python 2-style u'...' quoting that Yelp data uses for string attrs.
 
-    Streaming avoids loading the full ~5 GB review file into memory at once.
-
-    Returns a dict: { business_id: [review_text, ...] }
+    Examples:
+      u'free'   → 'free'
+      u'quiet'  → 'quiet'
+      'average' → 'average'
+      None / nan → ''
     """
-    reviews: dict[str, list[str]] = defaultdict(list)
+    if not val or str(val) in ("None", "nan"):
+        return ""
+    s = str(val).strip()
+    # Remove leading u (Python 2 unicode marker) then strip quotes
+    if s.startswith("u'") or s.startswith('u"'):
+        s = s[1:]
+    s = s.strip("'\"")
+    return s.strip()
 
-    logger.info("Streaming reviews from %s ...", review_json)
-    with open(review_json, encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            line = line.strip()
-            if not line:
-                continue
-            record = json.loads(line)
-            bid = record.get("business_id")
-            text = record.get("text", "").strip()
 
-            if bid in business_ids and len(reviews[bid]) < max_per_business:
-                reviews[bid].append(text)
+def parse_ambience(ambience_str) -> str:
+    """
+    Parse the Yelp ambience attribute (a stringified Python dict) and return
+    a comma-separated string of the True keys.
 
-            if i % 500_000 == 0 and i > 0:
-                logger.info("  Processed %d review lines so far...", i)
+    Example input:  "{'romantic': False, 'classy': True, 'casual': True}"
+    Example output: "classy, casual"
 
-    logger.info("Collected reviews for %d businesses", len(reviews))
-    return dict(reviews)
+    Returns an empty string if the input is missing, None, or unparseable.
+    """
+    if not ambience_str or str(ambience_str) in ("None", "nan"):
+        return ""
+    try:
+        # Replace Python 2 u'' prefixes so ast.literal_eval can parse the dict
+        cleaned = str(ambience_str).replace("u'", "'").replace('u"', '"')
+        d = ast.literal_eval(cleaned)
+        true_keys = [k for k, v in d.items() if v is True]
+        return ", ".join(true_keys)
+    except Exception:
+        return ""
 
 
 def format_price(price_range) -> str:
-    """Convert Yelp price range (1-4) to a readable label."""
-    mapping = {"1": "inexpensive", "2": "moderate", "3": "pricey", "4": "very expensive"}
-    return mapping.get(str(price_range), "unknown price")
+    """Convert Yelp price range (1–4) to a human-readable label."""
+    mapping = {
+        "1": "inexpensive",
+        "2": "moderate",
+        "3": "pricey",
+        "4": "very expensive",
+    }
+    return mapping.get(str(price_range), "")
 
+
+# ---------------------------------------------------------------------------
+# Review loading
+# ---------------------------------------------------------------------------
+
+def load_reviews_for_businesses(
+    reviews_csv: Path,
+    business_ids: set,
+    max_per_business: int,
+) -> dict[str, list[str]]:
+    """
+    Load pre-filtered reviews from philly_reviews.csv and group them by
+    business_id, keeping the first `max_per_business` entries per restaurant.
+
+    We only read the two columns we need (business_id, text) to stay memory
+    efficient — philly_reviews.csv has ~377k rows.
+
+    Returns:
+        { business_id: [review_text, review_text, ...] }
+    """
+    logger.info("Loading reviews from %s ...", reviews_csv)
+    df = pd.read_csv(reviews_csv, usecols=["business_id", "text"])
+
+    # Keep only reviews that belong to our set of restaurants
+    df = df[df["business_id"].isin(business_ids)]
+    df = df.dropna(subset=["text"])
+
+    reviews: dict[str, list[str]] = {}
+    for bid, group in df.groupby("business_id"):
+        # Take the first max_per_business rows (CSV order = chronological from
+        # run_preprocess's JOIN — deterministic and easy to debug)
+        texts = group["text"].tolist()[:max_per_business]
+        reviews[bid] = texts
+
+    logger.info("Collected reviews for %d / %d businesses", len(reviews), len(business_ids))
+    return reviews
+
+
+# ---------------------------------------------------------------------------
+# Profile text builder
+# ---------------------------------------------------------------------------
 
 def build_profile_text(row: pd.Series, review_texts: list[str]) -> str:
     """
-    Construct a single text block for one restaurant.
-    This text is what gets embedded — make it rich but concise.
+    Construct a single rich text block for one restaurant.
+    This text is what gets fed directly to the embedding model.
 
     Example output:
-      "Joe's Pizza. Cuisine: Pizza, Italian. Located in Manhattan, New York.
-       Rating: 4.5 stars. Price: inexpensive. Noise: average. WiFi: free.
-       Reviews: Best slice in the city. Classic NY pizza, always fresh..."
+      "Joe's Steaks + Soda Shop. Cuisine: Cheesesteaks, American. Located at
+       6030 Torresdale Ave, Philadelphia. Rating: 4.5 stars. Price: inexpensive.
+       Noise level: average. WiFi: free. Ambience: casual, casual.
+       Reviews: Best cheesesteak in the city hands down..."
     """
     parts = []
 
-    # Name and cuisine
-    name = str(row.get("name", ""))
-    categories = str(row.get("categories", ""))
-    parts.append(f"{name}.")
-    if categories:
+    # --- Name and cuisine ---
+    name = str(row.get("name", "") or "")
+    categories = str(row.get("categories", "") or "")
+    if name:
+        parts.append(f"{name}.")
+    if categories and categories != "nan":
         parts.append(f"Cuisine: {categories}.")
 
-    # Location
-    neighborhood = str(row.get("neighborhood", "") or "")
+    # --- Location: use address + city since neighborhood is mostly blank ---
+    address = str(row.get("address", "") or "")
     city = str(row.get("city", "") or "")
-    location_parts = [p for p in [neighborhood, city] if p]
+    location_parts = [p for p in [address, city] if p and p != "nan"]
     if location_parts:
-        parts.append(f"Located in {', '.join(location_parts)}.")
+        parts.append(f"Located at {', '.join(location_parts)}.")
 
-    # Rating and price
+    # --- Rating ---
     stars = row.get("stars")
     if stars is not None:
         parts.append(f"Rating: {stars} stars.")
 
+    # --- Price ---
     price_label = format_price(row.get("price_range"))
-    parts.append(f"Price: {price_label}.")
+    if price_label:
+        parts.append(f"Price: {price_label}.")
 
-    # Attributes
-    noise = row.get("attributes_noise_level")
-    if noise and str(noise) not in ("None", "nan"):
+    # --- Attributes (cleaned) ---
+    noise = clean_attr_value(row.get("attributes_noise_level"))
+    if noise and noise not in ("no", "none"):
         parts.append(f"Noise level: {noise}.")
 
-    wifi = row.get("attributes_wifi")
-    if wifi and str(wifi) not in ("None", "nan", "'no'", "no"):
+    wifi = clean_attr_value(row.get("attributes_wifi"))
+    if wifi and wifi not in ("no", "none"):
         parts.append(f"WiFi: {wifi}.")
 
-    ambience = row.get("attributes_ambience")
-    if ambience and str(ambience) not in ("None", "nan"):
-        # Ambience is a stringified dict; include it as-is for now
+    ambience = parse_ambience(row.get("attributes_ambience"))
+    if ambience:
         parts.append(f"Ambience: {ambience}.")
 
-    # Sampled review text
+    # --- Sampled review snippets ---
     if review_texts:
-        combined_reviews = " ".join(review_texts)
-        parts.append(f"Reviews: {combined_reviews}")
+        snippets = [t[:MAX_REVIEW_CHARS] for t in review_texts]
+        combined = " ".join(snippets)
+        parts.append(f"Reviews: {combined}")
 
     return " ".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Main pipeline entry point
+# ---------------------------------------------------------------------------
+
 def run(
-    restaurants_csv: Path = NYC_RESTAURANTS_CSV,
-    review_json: Path = REVIEW_JSON,
+    restaurants_csv: Path = PHILLY_RESTAURANTS_CSV,
+    reviews_csv: Path = PHILLY_REVIEWS_CSV,
     output_csv: Path = PROFILES_CSV,
 ) -> pd.DataFrame:
     """
     Full profile-building pipeline.
-    Reads the NYC restaurant CSV + Yelp reviews, builds profiles, writes output CSV.
+
+    1. Load philly_restaurants.csv
+    2. Load and group philly_reviews.csv by business_id
+    3. For each restaurant, build a profile_text string
+    4. Save restaurant_profiles.csv
+
+    Returns the resulting DataFrame.
     """
-    logger.info("Loading NYC restaurants from %s", restaurants_csv)
+    logger.info("Loading restaurants from %s", restaurants_csv)
     df = load_csv(restaurants_csv)
     logger.info("Building profiles for %d restaurants", len(df))
 
     business_ids = set(df["business_id"].tolist())
 
-    # Load reviews only if the review file exists (skip gracefully in dev)
+    # Load reviews (skip gracefully if file is missing — metadata-only mode)
     reviews_by_id: dict[str, list[str]] = {}
-    if review_json.exists():
+    if Path(reviews_csv).exists():
         reviews_by_id = load_reviews_for_businesses(
-            review_json, business_ids, MAX_REVIEWS_PER_RESTAURANT
+            reviews_csv, business_ids, MAX_REVIEWS_PER_RESTAURANT
         )
     else:
         logger.warning(
-            "Review file not found at %s. Profiles will be built from metadata only.", review_json
+            "Reviews CSV not found at %s. Profiles will use metadata only.", reviews_csv
         )
 
-    # Build a profile text for each restaurant
+    # Build one profile row per restaurant
     profile_rows = []
     for _, row in df.iterrows():
         bid = row["business_id"]
@@ -167,7 +250,7 @@ def run(
                 "review_count": row.get("review_count"),
                 "price_range": row.get("price_range"),
                 "city": row.get("city"),
-                "neighborhood": row.get("neighborhood"),
+                "address": row.get("address"),
                 "categories": row.get("categories"),
                 "profile_text": profile_text,
             }
@@ -178,7 +261,3 @@ def run(
     logger.info("Saved %d restaurant profiles to %s", len(df_profiles), output_csv)
 
     return df_profiles
-
-
-# TODO: Experiment with different amounts of review text to include
-# TODO: Consider deduplicating near-identical review snippets
