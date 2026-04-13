@@ -14,10 +14,44 @@ This project builds a restaurant recommendation system for Philadelphia, PA, usi
 
 ## Getting Started
 
-1. **Install Dependencies**: `pip install -r requirements.txt`
-2. **Preprocess Businesses**: `python scripts/run_preprocess.py`
-3. **Stream Join Reviews**: `python scripts/join_reviews.py`
-4. **Analysis**: Open `notebooks/data_analysis.ipynb`
+### Prerequisites
+Make sure you have Python 3 installed.
+
+### Setup
+
+1. Create a virtual environment
+```bash
+   python3 -m venv .venv
+```
+
+2. Activate the virtual environment
+```bash
+   source .venv/bin/activate
+```
+
+3. Install dependencies
+```bash
+   pip install -r requirements.txt
+```
+
+### Running the Pipeline
+
+4. Preprocess businesses
+```bash
+   python scripts/run_preprocess.py
+```
+
+5. Stream join reviews
+```bash
+   python scripts/join_reviews.py
+```
+
+### Analysis
+
+6. Open the analysis notebook
+```
+   notebooks/data_analysis.ipynb
+```
 
 ## Filtering Criteria
 
