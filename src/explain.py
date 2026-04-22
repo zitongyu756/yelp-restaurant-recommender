@@ -9,7 +9,7 @@ structured fields in the restaurant row.
 
 Example output:
   "Matched your interest in Italian food. Highly rated (4.5 ★) with 312 reviews.
-   Located in SoHo. Moderate price range."
+   Located in Philadelphia. Moderate price range."
 """
 
 import re

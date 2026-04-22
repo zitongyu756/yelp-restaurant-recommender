@@ -57,6 +57,34 @@ def cosine_similarity_one_to_many(query: np.ndarray, matrix: np.ndarray) -> np.n
     return similarities
 
 
+def dot_product_one_to_many(query: np.ndarray, matrix: np.ndarray) -> np.ndarray:
+    """
+    Dot product between a single query vector and every row in a 2-D matrix.
+
+    Mathematically equivalent to cosine similarity when both ``query`` and
+    every row of ``matrix`` are L2-normalized (unit norm). Skipping the norm
+    computation makes this much faster than ``cosine_similarity_one_to_many``
+    at query time — at the cost of requiring normalized inputs.
+
+    Args:
+        query:  1-D array of shape (D,), assumed L2-normalized.
+        matrix: 2-D array of shape (N, D), rows assumed L2-normalized.
+
+    Returns:
+        scores: 1-D array of shape (N,), values in [-1, 1].
+    """
+    if query.ndim != 1:
+        raise ValueError(f"query must be 1-D, got shape {query.shape}")
+    if matrix.ndim != 2:
+        raise ValueError(f"matrix must be 2-D, got shape {matrix.shape}")
+    if query.shape[0] != matrix.shape[1]:
+        raise ValueError(
+            f"Dimension mismatch: query has {query.shape[0]} dims, "
+            f"matrix has {matrix.shape[1]} dims"
+        )
+    return matrix @ query
+
+
 def top_k_indices(similarities: np.ndarray, k: int) -> np.ndarray:
     """
     Return the indices of the top-k highest similarity scores.

@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 # Page configuration
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="NYC Restaurant Recommender",
+    page_title="Philadelphia Restaurant Recommender",
     page_icon="🍽️",
     layout="centered",
 )
@@ -61,64 +61,64 @@ def get_mock_results(query: str) -> pd.DataFrame:
     mock = pd.DataFrame(
         [
             {
-                "name": "Joe's Pizza",
-                "categories": "Pizza, Italian",
-                "city": "Manhattan",
-                "neighborhood": "Greenwich Village",
+                "name": "Reading Terminal Market",
+                "categories": "Public Markets, Food Court, Bakeries, Seafood",
+                "city": "Philadelphia",
+                "address": "51 N 12th St",
                 "stars": 4.5,
-                "review_count": 1203,
-                "price_range": "1",
-                "similarity_score": 0.91,
-                "final_score": 0.87,
-                "explanation": "Serves Pizza, Italian. Located in Greenwich Village. Rated 4.5 ★ (1203 reviews). Price: $.",
-            },
-            {
-                "name": "Xi'an Famous Foods",
-                "categories": "Chinese, Noodles",
-                "city": "Manhattan",
-                "neighborhood": "East Village",
-                "stars": 4.3,
-                "review_count": 876,
-                "price_range": "1",
-                "similarity_score": 0.85,
-                "final_score": 0.81,
-                "explanation": "Serves Chinese, Noodles. Located in East Village. Rated 4.3 ★ (876 reviews). Price: $.",
-            },
-            {
-                "name": "Ippudo NY",
-                "categories": "Ramen, Japanese",
-                "city": "Manhattan",
-                "neighborhood": "East Village",
-                "stars": 4.2,
-                "review_count": 2340,
+                "review_count": 5721,
                 "price_range": "2",
+                "similarity_score": 0.88,
+                "final_score": 0.85,
+                "explanation": "Serves Public Markets, Food Court. Located in Philadelphia. Rated 4.5 ★ (5721 reviews). Price: $$.",
+            },
+            {
+                "name": "Zahav",
+                "categories": "Middle Eastern, Israeli, Bars",
+                "city": "Philadelphia",
+                "address": "237 St James Pl",
+                "stars": 4.5,
+                "review_count": 3065,
+                "price_range": "4",
+                "similarity_score": 0.85,
+                "final_score": 0.82,
+                "explanation": "Serves Middle Eastern, Israeli. Located in Philadelphia. Rated 4.5 ★ (3065 reviews). Price: $$$$.",
+            },
+            {
+                "name": "Parc",
+                "categories": "French, Wine Bars, American (New), Breakfast & Brunch",
+                "city": "Philadelphia",
+                "address": "227 S 18th St",
+                "stars": 4.0,
+                "review_count": 2761,
+                "price_range": "3",
                 "similarity_score": 0.82,
                 "final_score": 0.79,
-                "explanation": "Serves Ramen, Japanese. Located in East Village. Rated 4.2 ★ (2340 reviews). Price: $$.",
+                "explanation": "Serves French, Wine Bars. Located in Philadelphia. Rated 4.0 ★ (2761 reviews). Price: $$$.",
             },
             {
-                "name": "Dirt Candy",
-                "categories": "Vegetarian, American",
-                "city": "Manhattan",
-                "neighborhood": "Lower East Side",
-                "stars": 4.6,
-                "review_count": 512,
-                "price_range": "3",
+                "name": "Pizzeria Beddia",
+                "categories": "Italian, Pizza",
+                "city": "Philadelphia",
+                "address": "1313 North Lee St",
+                "stars": 4.0,
+                "review_count": 599,
+                "price_range": "2",
                 "similarity_score": 0.79,
                 "final_score": 0.76,
-                "explanation": "Serves Vegetarian, American. Located in Lower East Side. Rated 4.6 ★ (512 reviews). Price: $$$.",
+                "explanation": "Serves Italian, Pizza. Located in Philadelphia. Rated 4.0 ★ (599 reviews). Price: $$.",
             },
             {
-                "name": "Roberta's",
-                "categories": "Pizza, Italian, Bar",
-                "city": "Brooklyn",
-                "neighborhood": "Bushwick",
-                "stars": 4.4,
-                "review_count": 1890,
+                "name": "Joe's Steaks + Soda Shop",
+                "categories": "Cheesesteaks, Sandwiches, American (Traditional)",
+                "city": "Philadelphia",
+                "address": "1 W Girard Ave",
+                "stars": 4.0,
+                "review_count": 392,
                 "price_range": "2",
                 "similarity_score": 0.77,
                 "final_score": 0.74,
-                "explanation": "Serves Pizza, Italian. Located in Bushwick, Brooklyn. Rated 4.4 ★ (1890 reviews). Price: $$.",
+                "explanation": "Serves Cheesesteaks, Sandwiches. Located in Philadelphia. Rated 4.0 ★ (392 reviews). Price: $$.",
             },
         ]
     )
@@ -156,7 +156,7 @@ def run_search(query: str) -> pd.DataFrame:
 
     retrieve_module = load_retrieve_module()
     candidates = retrieve_module.retrieve(query, top_k=TOP_K_RETRIEVE)
-    reranked = rerank(candidates)
+    reranked = rerank(candidates, query=query)
     top = reranked.head(TOP_K_DISPLAY)
     results = add_explanations(top, query)
     return results
@@ -166,8 +166,8 @@ def run_search(query: str) -> pd.DataFrame:
 # UI Layout
 # ---------------------------------------------------------------------------
 
-st.title("🍽️ NYC Restaurant Recommender")
-st.caption("Powered by Yelp data · Semantic search · NYC only")
+st.title("🍽️ Philadelphia Restaurant Recommender")
+st.caption("Powered by Yelp data · Semantic search · Philadelphia only")
 
 st.markdown(
     "Type what you're looking for in plain English and we'll find the best match."
@@ -175,11 +175,11 @@ st.markdown(
 
 # Example queries shown as clickable buttons
 EXAMPLE_QUERIES = [
-    "quiet cafe to study near NYU",
-    "date night italian in SoHo",
-    "cheap spicy ramen in East Village",
-    "brunch with bottomless mimosas in Williamsburg",
-    "rooftop bar with great views in Manhattan",
+    "quiet cafe with good coffee to get work done",
+    "romantic italian restaurant for date night",
+    "cheap cheesesteak sandwich shop",
+    "casual brunch spot with a great breakfast menu",
+    "upscale seafood restaurant with cocktails",
 ]
 
 st.markdown("**Try an example:**")

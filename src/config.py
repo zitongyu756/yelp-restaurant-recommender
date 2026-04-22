@@ -3,7 +3,8 @@ config.py
 ---------
 Single source of truth for all paths and project-wide constants.
 
-Edit this file to change data locations, the embedding model, or NYC filter rules.
+Edit this file to change data locations, the embedding model, or the
+Philadelphia filter rules.
 """
 
 from pathlib import Path
