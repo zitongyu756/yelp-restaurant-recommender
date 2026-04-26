@@ -39,7 +39,7 @@ logger = get_logger(__name__)
 # Page configuration
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="NYC Restaurant Recommender",
+    page_title="Philly Restaurant Recommender",
     page_icon="🍽️",
     layout="centered",
 )
@@ -166,8 +166,8 @@ def run_search(query: str) -> pd.DataFrame:
 # UI Layout
 # ---------------------------------------------------------------------------
 
-st.title("🍽️ NYC Restaurant Recommender")
-st.caption("Powered by Yelp data · Semantic search · NYC only")
+st.title("🍽️ Philly Restaurant Recommender")
+st.caption("Powered by Yelp data · Semantic search · Philadelphia only")
 
 st.markdown(
     "Type what you're looking for in plain English and we'll find the best match."
@@ -175,11 +175,11 @@ st.markdown(
 
 # Example queries shown as clickable buttons
 EXAMPLE_QUERIES = [
-    "quiet cafe to study near NYU",
-    "date night italian in SoHo",
-    "cheap spicy ramen in East Village",
-    "brunch with bottomless mimosas in Williamsburg",
-    "rooftop bar with great views in Manhattan",
+    "quiet cafe to study near UPenn",
+    "date night italian in Rittenhouse",
+    "cheap spicy noodles in Chinatown",
+    "brunch spot in Old City",
+    "craft beer bar in Fishtown",
 ]
 
 st.markdown("**Try an example:**")
@@ -191,7 +191,7 @@ for col, example in zip(cols, EXAMPLE_QUERIES):
 # Text input — pre-filled from example button clicks via session state
 query = st.text_input(
     label="Your query",
-    placeholder="e.g. cheap spicy noodles near NYU",
+    placeholder="e.g. cheap cheesesteak in South Philly",
     key="query_input",
     label_visibility="collapsed",
 )

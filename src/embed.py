@@ -11,6 +11,8 @@ The row order in embeddings.npy matches the row order in restaurant_profiles.csv
 Always load both files together so indices stay aligned.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 from sentence_transformers import SentenceTransformer
@@ -61,8 +63,6 @@ def run(
     Loads profiles, embeds them, and saves the result.
     Returns the embedding matrix.
     """
-    from pathlib import Path  # local import to keep top-level imports clean
-
     profiles_csv = Path(profiles_csv)
     output_npy = Path(output_npy)
 
