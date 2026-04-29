@@ -70,7 +70,10 @@ START_YEAR = 2019
 # Profile builder settings
 # ---------------------------------------------------------------------------
 # How many review texts to sample per restaurant when building the profile
-MAX_REVIEWS_PER_RESTAURANT = 5
+# We load a larger number (40) to accurately extract aggregate keywords 
+# and pricing signals, but only the first few full sentences are included
+# in the final embedding to avoid token limits.
+MAX_REVIEWS_PER_RESTAURANT = 40
 
 # ---------------------------------------------------------------------------
 # Embedding model

@@ -41,8 +41,50 @@ logger = get_logger(__name__)
 st.set_page_config(
     page_title="Philly Restaurant Recommender",
     page_icon="🍽️",
-    layout="centered",
+    layout="wide", # Wider layout for premium feel
+    initial_sidebar_state="expanded",
 )
+
+# Premium CSS Styling
+st.markdown("""
+    <style>
+    /* Modern font and subtle background */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Enhance the card borders */
+    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"]:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        transform: translateY(-2px);
+    }
+    
+    /* Stylize the metrics */
+    [data-testid="stMetricValue"] {
+        font-weight: 800;
+        color: #FF4B4B; /* Yelp red accent */
+    }
+    
+    /* Badge styling */
+    .feature-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        margin-right: 6px;
+        margin-bottom: 6px;
+        border-radius: 20px;
+        background: rgba(255, 75, 75, 0.1);
+        color: #FF4B4B;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: 1px solid rgba(255, 75, 75, 0.2);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
 # Helper: detect whether processed data is available
@@ -172,12 +214,21 @@ def run_search(query: str, min_stars: float = 0.0) -> pd.DataFrame:
 # UI Layout
 # ---------------------------------------------------------------------------
 
-st.title("🍽️ Philly Restaurant Recommender")
-st.caption("Powered by Yelp data · Semantic search · Philadelphia only")
+st.title("🍽️ AI-Powered Philly Restaurant Recommender")
+st.caption("Not just keywords. We read the reviews so you don't have to.")
 
-st.markdown(
-    "Type what you're looking for in plain English and we'll find the best match."
-)
+with st.expander("Why is this better than regular Yelp?"):
+    st.markdown("""
+        **Regular Yelp** forces you to use rigid filters (e.g., checking the "Italian" box and the "$$" box).
+        **This app** uses **Semantic AI (Sentence Transformers)** to actually *understand* the meaning of your search.
+        
+        It mathematically reads thousands of customer reviews to find the exact "vibe" you are looking for. 
+        Try asking it complex questions like:
+        - *"Where can I take my parents for a quiet anniversary dinner?"*
+        - *"A loud sports bar with cheap wings and good beer"*
+    """)
+
+st.markdown("---")
 
 # Example queries shown as clickable buttons
 EXAMPLE_QUERIES = [
@@ -230,26 +281,48 @@ if search_clicked and query.strip():
             # Final score converted to a percentage
             match_pct = int(row.get("final_score", 0) * 100)
             
+            # Semantic Similarity Score (the pure AI match)
+            semantic_score = int(row.get("similarity_score", 0) * 100)
+            
             with st.container(border=True):
-                col_rank, col_info, col_score = st.columns([1, 7, 2])
+                col_rank, col_info, col_metrics = st.columns([1, 6, 2])
                 with col_rank:
-                    st.markdown(f"## #{rank}")
+                    st.markdown(f"<h1 style='color:#FF4B4B;'>#{rank}</h1>", unsafe_allow_html=True)
                 with col_info:
                     st.markdown(f"### {row.get('name', 'Unknown')}")
                     meta_parts = [stars_display, review_display]
                     if price_display:
                         meta_parts.append(price_display)
                     neighborhood = str(row.get("neighborhood", "") or "")
+                    address = str(row.get("address", "") or "")
                     city = str(row.get("city", "") or "")
-                    location = neighborhood if neighborhood and neighborhood != "nan" else city
-                    if location and location != "nan":
-                        meta_parts.append(f"📍 {location}")
+                    
+                    if address and address != "nan":
+                        meta_parts.append(f"📍 {address}")
+                    elif neighborhood and neighborhood != "nan":
+                        meta_parts.append(f"📍 {neighborhood}")
+                    elif city and city != "nan":
+                        meta_parts.append(f"📍 {city}")
                     st.caption("  ·  ".join(meta_parts))
                     st.markdown(f"*{row.get('categories', '')}*")
+                    
+                    # Badges for vibe elements
+                    badges_html = ""
+                    if "quiet" in str(row.get("explanation", "")).lower():
+                        badges_html += "<span class='feature-badge'>🤫 Quiet Setting</span>"
+                    if "romantic" in str(row.get("explanation", "")).lower():
+                        badges_html += "<span class='feature-badge'>❤️ Romantic</span>"
+                    if "budget" in str(row.get("explanation", "")).lower():
+                        badges_html += "<span class='feature-badge'>💰 Budget Friendly</span>"
+                        
+                    if badges_html:
+                        st.markdown(badges_html, unsafe_allow_html=True)
+                        
                     st.info(row.get("explanation", ""), icon="💡")
-                with col_score:
-                    st.metric("Match Score", f"{match_pct}%")
+                with col_metrics:
+                    st.metric("Overall Match", f"{match_pct}%")
                     st.progress(match_pct / 100.0)
+                    st.caption(f"🤖 Semantic AI Score: **{semantic_score}%**")
 
 elif search_clicked and not query.strip():
     st.error("Please enter a query before searching.")

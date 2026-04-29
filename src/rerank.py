@@ -35,10 +35,11 @@ VERY_EXPENSIVE_KEYWORDS = {"very expensive", "overpriced", "luxury"}
 # ---------------------------------------------------------------------------
 # Reranking weights — must sum to 1.0 for interpretability (not required)
 # ---------------------------------------------------------------------------
-W_SIMILARITY   = 0.48   # semantic similarity to the query
-W_STARS        = 0.20   # normalized star rating
-W_POPULARITY   = 0.12   # log-normalized review count (proxy for popularity)
-W_PRICE_MATCH = 0.20          # price range match
+W_SIMILARITY   = 0.40   # semantic similarity to the query
+W_STARS        = 0.15   # normalized star rating
+W_POPULARITY   = 0.10   # log-normalized review count (proxy for popularity)
+W_PRICE_MATCH  = 0.15   # price range match
+W_LOCATION     = 0.20   # exact neighborhood match
 
 def normalize_min_max(series: pd.Series) -> pd.Series:
     """Scale a Series to [0, 1] using min-max normalization."""
@@ -110,6 +111,32 @@ def compute_price_score(df: pd.DataFrame, query: str) -> pd.Series:
     final_score = pd.concat(scores, axis=1).max(axis=1)
     return final_score.clip(0, 1)
 
+def compute_location_score(df: pd.DataFrame, query: str) -> pd.Series:
+    """
+    Compute a location score (0.0 or 1.0). If the query explicitly mentions
+    the restaurant's neighborhood or city, it gets a massive relevance boost.
+    """
+    if not query:
+        return pd.Series(np.zeros(len(df)), index=df.index)
+        
+    query_lower = query.lower()
+    scores = np.zeros(len(df))
+    
+    # Safely get columns (they might be missing depending on how profiles were built)
+    hoods = df.get("neighborhood", pd.Series([""] * len(df)))
+    cities = df.get("city", pd.Series([""] * len(df)))
+    
+    for i, (hood, city) in enumerate(zip(hoods, cities)):
+        hood_str = str(hood).lower() if pd.notna(hood) else ""
+        city_str = str(city).lower() if pd.notna(city) else ""
+        
+        if hood_str and len(hood_str) > 3 and hood_str in query_lower:
+            scores[i] = 1.0
+        elif city_str and len(city_str) > 3 and city_str in query_lower:
+            scores[i] = 1.0
+            
+    return pd.Series(scores, index=df.index)
+
 def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     """
     Rerank a DataFrame of candidate restaurants using a weighted combination
@@ -134,20 +161,23 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     w_stars = W_STARS
     w_pop = W_POPULARITY
     w_price = W_PRICE_MATCH
+    w_loc = W_LOCATION
 
     # Check for popularity/review count intent
     if any(kw in query_lower for kw in ["most reviews", "popular", "many reviews", "most reviewed"]):
-        w_pop = 0.60
-        w_sim = 0.20
+        w_pop = 0.50
+        w_sim = 0.15
         w_stars = 0.10
         w_price = 0.10
+        w_loc = 0.15
 
     # Check for rating intent
     elif any(kw in query_lower for kw in ["highest rated", "best rated", "top rated"]):
-        w_stars = 0.60
-        w_sim = 0.20
+        w_stars = 0.50
+        w_sim = 0.15
         w_pop = 0.10
         w_price = 0.10
+        w_loc = 0.15
 
     norm_similarity = normalize_min_max(candidates["similarity_score"])
     
@@ -163,12 +193,24 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     
     quality_score = w_stars * norm_stars + w_pop * norm_reviews
     price_score = compute_price_score(candidates, query)
+    loc_score = compute_location_score(candidates, query)
+    
+    # Re-allocate weights if specific constraints aren't used in the query
+    # so we don't artificially lower the overall Match Score.
+    if loc_score.max() == 0.0:
+        w_sim += w_loc
+        w_loc = 0.0
+        
+    if (price_score == 1.0).all():
+        w_sim += w_price
+        w_price = 0.0
     
     candidates = candidates.copy()
     candidates["final_score"] = (
         w_sim * norm_similarity
         + quality_score
         + w_price * price_score
+        + w_loc * loc_score
     )
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)

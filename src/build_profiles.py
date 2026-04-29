@@ -24,6 +24,7 @@ Output:
 import ast
 import regex as re
 from pathlib import Path
+from collections import Counter
 
 import pandas as pd
 
@@ -181,6 +182,45 @@ def extract_price_from_reviews(reviews: list[str]) -> float:
     return round(weighted_costliness, 2)
 
 
+def extract_review_keywords(reviews: list[str], top_n: int = 15) -> str:
+    """
+    Extract the most frequent meaningful words from a large pool of reviews.
+    This concentrates the overall sentiment into a dense list of keywords
+    that the embedding model can easily pick up on.
+    """
+    if not reviews:
+        return ""
+        
+    combined = " ".join(reviews).lower()
+    # Extract words between 4 and 12 characters (filters out a/the/and automatically)
+    words = re.findall(r"\b[a-z]{4,12}\b", combined)
+    
+    # Common words that don't help with recommendation semantics
+    stopwords = {
+        "this", "that", "with", "from", "they", "have", "were", "there", 
+        "which", "their", "what", "when", "about", "would", "could", 
+        "should", "been", "some", "very", "just", "like", "good", "great", 
+        "food", "place", "restaurant", "really", "back", "also", "only", 
+        "even", "well", "much", "time", "here", "because", "other", "them", 
+        "than", "more", "then", "make", "made", "best", "always", "will",
+        "never", "ever", "came", "went", "come", "go", "going", "got",
+        "get", "getting", "one", "two", "three", "first", "next", "last",
+        "definitely", "highly", "recommend", "recommended", "ordered",
+        "order", "menu", "service", "staff", "friendly", "nice", "love",
+        "loved", "amazing", "awesome", "excellent", "delicious", "tasty",
+        "super", "pretty", "little", "right", "sure", "thing", "think",
+        "thought", "know", "knew", "say", "said", "tell", "told", "people",
+        "us", "we", "our", "you", "your", "my", "me", "i", "am", "is",
+        "are", "was", "be", "do", "did", "done", "can", "cannot", "can't",
+        "won't", "don't", "didn't", "has", "had"
+    }
+    
+    filtered = [w for w in words if w not in stopwords]
+    most_common = [word for word, count in Counter(filtered).most_common(top_n)]
+    
+    return ", ".join(most_common)
+
+
 # ---------------------------------------------------------------------------
 # Review loading
 # ---------------------------------------------------------------------------
@@ -273,9 +313,15 @@ def build_profile_text(row: pd.Series, review_texts: list[str]) -> str:
     if ambience:
         parts.append(f"Ambience: {ambience}.")
 
+    # --- Concentrated Review Keywords ---
+    keywords = extract_review_keywords(review_texts)
+    if keywords:
+        parts.append(f"Popular Keywords: {keywords}.")
+
     # --- Sampled review snippets ---
     if review_texts:
-        snippets = [t[:MAX_REVIEW_CHARS] for t in review_texts]
+        # Only take the first 3 reviews for full snippets to avoid token limits
+        snippets = [t[:MAX_REVIEW_CHARS] for t in review_texts[:3]]
         combined = " ".join(snippets)
         parts.append(f"Reviews: {combined}")
 

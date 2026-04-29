@@ -178,8 +178,15 @@ def _extract_review_highlight(profile_text: str, query: str, max_chars: int = 16
         return ""
 
     highlight = " ".join(selected)
+    
+    # Bold the user's query keywords in the highlight
+    for word in query_words:
+        if len(word) > 3:  # Only bold meaningful words
+            pattern = re.compile(rf"\b({re.escape(word)})\b", re.IGNORECASE)
+            highlight = pattern.sub(r"**\1**", highlight)
+            
     # Ensure it ends with punctuation
-    if highlight and highlight[-1] not in ".!?":
+    if highlight and highlight[-1] not in ".!?*\"":
         highlight += "."
     return f'"{highlight}"'
 
@@ -207,10 +214,22 @@ def generate_explanation(row: pd.Series, query: str) -> str:
 
     # --- Location ---
     neighborhood = str(row.get("neighborhood", "") or "")
+    address = str(row.get("address", "") or "")
     city = str(row.get("city", "") or "")
-    location = neighborhood if neighborhood and neighborhood != "nan" else city
-    if location and location != "nan":
-        parts.append(f"Located in {location}.")
+    
+    if address and address != "nan":
+        if neighborhood and neighborhood != "nan":
+            parts.append(f"Located at {address} ({neighborhood}).")
+        else:
+            parts.append(f"Located at {address}.")
+    elif neighborhood and neighborhood != "nan":
+        parts.append(f"Located in {neighborhood}.")
+    elif city and city != "nan":
+        parts.append(f"Located in {city}.")
+        
+    # Check for exact neighborhood match
+    if neighborhood and neighborhood != "nan" and neighborhood.lower() in query.lower():
+        parts.append("Exact neighborhood match.")
 
     # --- Rating ---
     stars = row.get("stars")
