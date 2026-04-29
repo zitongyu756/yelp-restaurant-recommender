@@ -60,37 +60,6 @@ def embed_texts(model: SentenceTransformer, texts: list[str]) -> np.ndarray:
     norms = np.where(norms == 0, 1e-10, norms)
     return embeddings / norms
 
-def embed_texts_chunked(
-    model: SentenceTransformer,
-    texts: list[str],
-    chunk_size: int = 5000,
-    output_npy: Path = None,
-) -> np.ndarray:
-    """
-    Embed texts in chunks, saving partial .npy files after each chunk so
-    progress isn't lost if the process is interrupted mid-run.
-
-    Use this instead of embed_texts when len(texts) is very large (e.g. >10k)
-    and you're worried about running out of memory or losing progress midway.
-
-    Partial files are named embeddings_chunk_0.npy, embeddings_chunk_1.npy, ...
-    and are deleted automatically once the full array is assembled.
-
-    Args:
-        model:       A loaded SentenceTransformer model.
-        texts:       List of strings to embed.
-        chunk_size:  How many texts to encode per chunk.
-        output_npy:  Base path used to name partial files (optional).
-
-    Returns:
-        embeddings: shape (len(texts), embedding_dim), dtype float32.
-    """
-    chunks = [texts[i:i + chunk_size] for i in range(0, len(texts), chunk_size)]
-    logger.info(
-        "Embedding %d texts in %d chunks of up to %d",
-        len(texts), len(chunks), chunk_size,
-    )
-
     partial_arrays = []
     for idx, chunk in enumerate(chunks):
         logger.info("  chunk %d/%d (%d texts)...", idx + 1, len(chunks), len(chunk))
