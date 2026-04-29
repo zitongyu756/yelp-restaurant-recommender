@@ -73,7 +73,7 @@ def _price_label(price_range) -> str:
     Returns an empty string for missing / un-parseable values.
     """
     try:
-        tier = str(round(float(price_range)))
+        tier = int(round(float(price_range)))
         return PRICE_LABEL.get(tier, "")
     except (ValueError, TypeError):
         return ""
