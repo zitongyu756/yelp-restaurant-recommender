@@ -29,9 +29,10 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # Reranking weights — must sum to 1.0 for interpretability (not required)
 # ---------------------------------------------------------------------------
-W_SIMILARITY   = 0.60   # semantic similarity to the query
-W_STARS        = 0.25   # normalized star rating
-W_POPULARITY   = 0.15   # log-normalized review count (proxy for popularity)
+W_SIMILARITY   = 0.48   # semantic similarity to the query
+W_STARS        = 0.20   # normalized star rating
+W_POPULARITY   = 0.12   # log-normalized review count (proxy for popularity)
+W_PRICE = 0.20          # price range match
 
 
 def normalize_min_max(series: pd.Series) -> pd.Series:
@@ -50,11 +51,13 @@ def compute_quality_score(df: pd.DataFrame) -> pd.Series:
     """
     stars = pd.to_numeric(df["stars"], errors="coerce").fillna(0)
     review_count = pd.to_numeric(df["review_count"], errors="coerce").fillna(0)
+    price = pd.to_numeric(df["price_range"], errors="coerce").fillna(0)
 
     norm_stars = normalize_min_max(stars)
     norm_reviews = normalize_min_max(np.log1p(review_count))  # log dampens extreme counts
+    norm_price = normalize_min_max(price)
 
-    quality = W_STARS * norm_stars + W_POPULARITY * norm_reviews
+    quality = W_STARS * norm_stars + W_POPULARITY * norm_reviews + W_PRICE * norm_price
     return quality
 
 
