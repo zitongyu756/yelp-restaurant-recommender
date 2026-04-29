@@ -130,7 +130,26 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     )
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)
-    logger.info("Reranked %d candidates", len(reranked))
+
+    # Apply cluster-based diversity penalty
+    # This ensures that we don't just show 5 restaurants with the exact same "vibe" (cluster).
+    # We penalize restaurants if their cluster has already appeared higher in the ranking.
+    if "cluster_id" in reranked.columns:
+        seen_clusters = set()
+        penalized_scores = []
+        for _, row in reranked.iterrows():
+            cluster = row.get("cluster_id")
+            score = row["final_score"]
+            if pd.notna(cluster) and cluster in seen_clusters:
+                score -= 0.10  # 10% penalty for redundant cluster
+            elif pd.notna(cluster):
+                seen_clusters.add(cluster)
+            penalized_scores.append(score)
+        
+        reranked["final_score"] = penalized_scores
+        reranked = reranked.sort_values("final_score", ascending=False).reset_index(drop=True)
+
+    logger.info("Reranked %d candidates with diversity penalty applied", len(reranked))
     return reranked
 
 

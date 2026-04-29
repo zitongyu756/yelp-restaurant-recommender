@@ -102,42 +102,83 @@ def format_price(price_range) -> str:
 
 def extract_price_from_reviews(reviews: list[str]) -> float:
     """
-    Analyze review text to determine an approximate price level, excluding negators.
+    Estimate price tier (1–4) from review text using a broad natural-language vocabulary.
+
+    The original keyword list was too narrow (people rarely write "fair price" or
+    "moderate" verbatim). This version matches the phrases reviewers actually use,
+    e.g. "great value", "steep", "wallet-friendly", "splurge", "worth every penny".
+
+    Negation is handled by checking the 3 words preceding each match.
+    Requires at least 3 signal hits for a confident estimate.
 
     Args:
         reviews: List of review texts for a restaurant.
 
     Returns:
-        A scalar representing the costliness (1.0 = inexpensive, 4.0 = very expensive),
-        or 0.0 if no price information is found.
+        Estimated price tier as a float (1.0–4.0), or 0.0 if signal is too weak.
     """
-    price_keywords = {
-        1.0: ["cheap", "affordable", "budget"],
-        2.0: ["moderate", "reasonable", "fair price"],
-        3.0: ["expensive", "pricey", "costly"],
-        4.0: ["very expensive", "overpriced", "luxury"]
+    # Phrases people actually write in Yelp reviews, grouped by price tier
+    PRICE_SIGNALS: dict[float, list[str]] = {
+        1.0: [
+            "cheap", "cheapest", "so cheap", "super cheap", "dirt cheap",
+            "very cheap", "inexpensive", "affordable", "budget",
+            "wallet.friendly", "pocket.friendly", "easy on the wallet",
+            "easy on the pocket", "great value", "good value", "excellent value",
+            "amazing value", "best value", "value for money", "worth every penny",
+            "won't break the bank", "doesn't break the bank", "bargain",
+            "low price", "low prices", "low cost", "price is right",
+            "prices are right", "price can't be beat", "can't beat the price",
+        ],
+        2.0: [
+            "moderate", "moderately priced", "mid.range", "midrange",
+            "middle of the road", "fair price", "fair prices",
+            "decent price", "decent prices", "reasonable", "reasonably priced",
+            "average price", "average prices", "normal price", "standard price",
+            "not too expensive", "not too pricey", "not too cheap",
+        ],
+        3.0: [
+            "pricey", "pricy", "expensive", "costly", "steep", "steeply priced",
+            "a bit pricey", "a bit expensive", "a bit steep", "kind of pricey",
+            "on the pricier side", "on the expensive side", "runs a bit high",
+            "pay a premium", "premium price", "premium prices",
+            "high price", "high prices", "high end", "not cheap",
+            "not inexpensive", "overpriced", "overprice",
+        ],
+        4.0: [
+            "very expensive", "super expensive", "extremely expensive",
+            "very pricey", "very steep", "way too expensive", "way overpriced",
+            "luxury", "luxurious", "upscale", "fine dining", "splurge",
+            "special occasion", "white tablecloth", "michelin", "tasting menu",
+            "once in a lifetime", "celebratory meal", "high end restaurant",
+        ],
     }
 
-    negators = ["not", "n't", "no"]
+    NEGATORS = {"not", "no", "never", "without", "n't", "hardly", "barely"}
 
-    # Combine all reviews into one text block for analysis
-    combined_reviews = " ".join(reviews).lower()
+    combined = " ".join(reviews).lower()
+    category_counts: dict[float, int] = {level: 0 for level in PRICE_SIGNALS}
 
-    category_counts = {level: 0 for level in price_keywords}
+    for price_level, phrases in PRICE_SIGNALS.items():
+        for phrase in phrases:
+            # Convert '.' wildcard shorthand (e.g. wallet.friendly) to \w* regex
+            pattern = rf"\b{phrase.replace('.', r'\w*')}\b"
+            for match in re.finditer(pattern, combined):
+                # Check the 4 words immediately before the match for negators
+                preceding_text = combined[max(0, match.start() - 35) : match.start()]
+                preceding_words = preceding_text.split()
+                is_negated = bool(NEGATORS.intersection(preceding_words[-4:]))
+                if not is_negated:
+                    category_counts[price_level] += 1
 
-    for price_level, keywords in price_keywords.items():
-        for keyword in keywords:
-            # Match keywords but exclude those preceded by negators
-            matches = re.findall(rf"(?<!\b(?:{'|'.join(negators)})\s)\b{keyword}\b", combined_reviews)
-            category_counts[price_level] += len(matches)
-
-    # Calculate weighted average of costliness based on counts
     total_mentions = sum(category_counts.values())
-    if total_mentions == 0:
+    # Require at least 2 signal hits to avoid noise from a single accidental word
+    if total_mentions < 2:
         return 0.0
 
-    weighted_costliness = sum(level * count for level, count in category_counts.items()) / total_mentions
-    return weighted_costliness
+    weighted_costliness = (
+        sum(level * count for level, count in category_counts.items()) / total_mentions
+    )
+    return round(weighted_costliness, 2)
 
 
 # ---------------------------------------------------------------------------
@@ -284,9 +325,15 @@ def run(
         review_texts = reviews_by_id.get(bid, [])
         profile_text = build_profile_text(row, review_texts)
 
-        # Determine approximate price from reviews
-        approx_price = extract_price_from_reviews(review_texts)
-        price_range = approx_price if approx_price > 0 else row.get("price_range")
+        # Fill in missing Yelp price using review-text estimation.
+        # Only apply when Yelp has no price data — never override a valid Yelp value,
+        # since Yelp's own data is more reliable than keyword counting.
+        yelp_price = row.get("price_range")
+        if pd.isna(yelp_price):
+            approx_price = extract_price_from_reviews(review_texts)
+            price_range = approx_price if approx_price > 0 else yelp_price
+        else:
+            price_range = yelp_price
 
         profile_rows.append(
             {
