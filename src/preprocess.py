@@ -1,10 +1,11 @@
 """
 preprocess.py
 -------------
-Loads the raw Yelp business JSON and filters it down to NYC restaurants.
+Loads the raw Yelp business JSON and filters it down to Philadelphia
+restaurants.
 
 Input:  data/raw/yelp_academic_dataset_business.json
-Output: data/interim/nyc_restaurants.csv
+Output: data/processed/philly_restaurants.csv
 
 Columns kept in the output:
   business_id, name, city, state, neighborhood, address,
