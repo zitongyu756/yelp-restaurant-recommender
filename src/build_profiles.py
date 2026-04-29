@@ -22,6 +22,7 @@ Output:
 """
 
 import ast
+import regex as re
 from pathlib import Path
 
 import pandas as pd
@@ -97,6 +98,46 @@ def format_price(price_range) -> str:
         "4": "very expensive",
     }
     return mapping.get(str(price_range), "")
+
+
+def extract_price_from_reviews(reviews: list[str]) -> float:
+    """
+    Analyze review text to determine an approximate price level, excluding negators.
+
+    Args:
+        reviews: List of review texts for a restaurant.
+
+    Returns:
+        A scalar representing the costliness (1.0 = inexpensive, 4.0 = very expensive),
+        or 0.0 if no price information is found.
+    """
+    price_keywords = {
+        1.0: ["cheap", "affordable", "budget"],
+        2.0: ["moderate", "reasonable", "fair price"],
+        3.0: ["expensive", "pricey", "costly"],
+        4.0: ["very expensive", "overpriced", "luxury"]
+    }
+
+    negators = ["not", "n't", "no"]
+
+    # Combine all reviews into one text block for analysis
+    combined_reviews = " ".join(reviews).lower()
+
+    category_counts = {level: 0 for level in price_keywords}
+
+    for price_level, keywords in price_keywords.items():
+        for keyword in keywords:
+            # Match keywords but exclude those preceded by negators
+            matches = re.findall(rf"(?<!\b(?:{'|'.join(negators)})\s)\b{keyword}\b", combined_reviews)
+            category_counts[price_level] += len(matches)
+
+    # Calculate weighted average of costliness based on counts
+    total_mentions = sum(category_counts.values())
+    if total_mentions == 0:
+        return 0.0
+
+    weighted_costliness = sum(level * count for level, count in category_counts.items()) / total_mentions
+    return weighted_costliness
 
 
 # ---------------------------------------------------------------------------
@@ -242,13 +283,18 @@ def run(
         bid = row["business_id"]
         review_texts = reviews_by_id.get(bid, [])
         profile_text = build_profile_text(row, review_texts)
+
+        # Determine approximate price from reviews
+        approx_price = extract_price_from_reviews(review_texts)
+        price_range = approx_price if approx_price > 0 else row.get("price_range")
+
         profile_rows.append(
             {
                 "business_id": bid,
                 "name": row.get("name"),
                 "stars": row.get("stars"),
                 "review_count": row.get("review_count"),
-                "price_range": row.get("price_range"),
+                "price_range": price_range,
                 "city": row.get("city"),
                 "address": row.get("address"),
                 "categories": row.get("categories"),
