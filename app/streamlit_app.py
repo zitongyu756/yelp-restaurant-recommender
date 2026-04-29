@@ -156,7 +156,7 @@ def run_search(query: str) -> pd.DataFrame:
 
     retrieve_module = load_retrieve_module()
     candidates = retrieve_module.retrieve(query, top_k=TOP_K_RETRIEVE)
-    reranked = rerank(candidates)
+    reranked = rerank(candidates, query)
     top = reranked.head(TOP_K_DISPLAY)
     results = add_explanations(top, query)
     return results
