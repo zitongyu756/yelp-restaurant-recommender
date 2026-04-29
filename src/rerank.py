@@ -19,6 +19,7 @@ Strategy (simple weighted sum):
 All weights are configurable at the top of this file.
 """
 
+import regex as re
 import numpy as np
 import pandas as pd
 
@@ -26,13 +27,18 @@ from src.utils import get_logger
 
 logger = get_logger(__name__)
 
+CHEAP_KEYWORDS = {"cheap", "affordable", "budget"}
+MODERATE_KEYWORDS = {"moderate", "reasonable", "fair price"}
+EXPENSIVE_KEYWORDS = {"expensive", "pricey", "costly"}
+VERY_EXPENSIVE_KEYWORDS = {"very expensive", "overpriced", "luxury"}
+
 # ---------------------------------------------------------------------------
 # Reranking weights — must sum to 1.0 for interpretability (not required)
 # ---------------------------------------------------------------------------
-W_SIMILARITY   = 0.60   # semantic similarity to the query
-W_STARS        = 0.25   # normalized star rating
-W_POPULARITY   = 0.15   # log-normalized review count (proxy for popularity)
-
+W_SIMILARITY   = 0.48   # semantic similarity to the query
+W_STARS        = 0.20   # normalized star rating
+W_POPULARITY   = 0.12   # log-normalized review count (proxy for popularity)
+W_PRICE_MATCH = 0.20          # price range match
 
 def normalize_min_max(series: pd.Series) -> pd.Series:
     """Scale a Series to [0, 1] using min-max normalization."""
@@ -57,8 +63,46 @@ def compute_quality_score(df: pd.DataFrame) -> pd.Series:
     quality = W_STARS * norm_stars + W_POPULARITY * norm_reviews
     return quality
 
+def compute_price_score(df: pd.DataFrame, query: str) -> pd.Series:
+    """
+    Compute a price score in [0, 1] from user query and price range (1 to 4).
+    """
+    if not query:
+        return pd.Series(np.ones(len(df)), index=df.index)
 
-def rerank(candidates: pd.DataFrame) -> pd.DataFrame:
+    query_lower = query.lower()
+    
+    # Use regex to properly match multi-word phrases like "very expensive"
+    wants_cheap = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in CHEAP_KEYWORDS)
+    wants_moderate = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in MODERATE_KEYWORDS)
+    wants_expensive = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in EXPENSIVE_KEYWORDS)
+    wants_very_expensive = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in VERY_EXPENSIVE_KEYWORDS)
+
+    ideal_prices = []
+    if wants_cheap:
+        ideal_prices.append(1.0)
+    if wants_moderate:
+        ideal_prices.append(2.0)
+    if wants_expensive:
+        ideal_prices.append(3.0)
+    if wants_very_expensive:
+        ideal_prices.append(4.0)
+
+    if not ideal_prices:
+        return pd.Series(np.ones(len(df)), index=df.index)
+
+    price = pd.to_numeric(df["price_range"], errors="coerce").fillna(2.0)
+    
+    scores = []
+    for ideal in ideal_prices:
+        # Score is 1.0 at ideal price, decreasing by 0.33 for each tier away
+        score = 1.0 - (np.abs(price - ideal) / 3.0)
+        scores.append(score)
+        
+    final_score = pd.concat(scores, axis=1).max(axis=1)
+    return final_score.clip(0, 1)
+
+def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     """
     Rerank a DataFrame of candidate restaurants using a weighted combination
     of semantic similarity and structured quality signals.
@@ -66,6 +110,7 @@ def rerank(candidates: pd.DataFrame) -> pd.DataFrame:
     Args:
         candidates: DataFrame returned by retrieve.retrieve().
                     Must contain columns: similarity_score, stars, review_count.
+        query: The original user query, used for price preference matching.
 
     Returns:
         DataFrame sorted by final_score descending, with a new 'final_score' column.
@@ -75,11 +120,13 @@ def rerank(candidates: pd.DataFrame) -> pd.DataFrame:
 
     norm_similarity = normalize_min_max(candidates["similarity_score"])
     quality_score = compute_quality_score(candidates)
-
+    price_score = compute_price_score(candidates, query)
+    
     candidates = candidates.copy()
     candidates["final_score"] = (
         W_SIMILARITY * norm_similarity
         + quality_score  # already includes W_STARS and W_POPULARITY weights
+        + W_PRICE_MATCH * price_score
     )
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)
