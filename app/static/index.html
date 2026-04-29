@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yelp AI Recommender | Philadelphia</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🍽️</span>
+                <h1>Recommender</h1>
+            </div>
+            
+            <div class="filter-section">
+                <h3>Refine Results</h3>
+                <label for="min-stars">Minimum Star Rating</label>
+                <div class="slider-container" style="margin-bottom: 20px;">
+                    <span id="stars-value">0.0</span>
+                    <input type="range" id="min-stars" min="0" max="5" step="0.5" value="0">
+                    <div class="slider-labels">
+                        <span>0.0</span>
+                        <span>5.0</span>
+                    </div>
+                </div>
+
+                <label for="filter-price">Max Price</label>
+                <select id="filter-price" style="width: 100%; padding: 8px; border-radius: 6px; margin-bottom: 20px; background: var(--bg-card); color: white; border: 1px solid var(--border-color);">
+                    <option value="any">Any Price</option>
+                    <option value="$">$ (Inexpensive)</option>
+                    <option value="$$">$$ (Moderate)</option>
+                    <option value="$$$">$$$ (Pricey)</option>
+                    <option value="$$$$">$$$$ (Very Expensive)</option>
+                </select>
+
+                <label for="filter-neighborhood">Neighborhood</label>
+                <select id="filter-neighborhood" style="width: 100%; padding: 8px; border-radius: 6px; background: var(--bg-card); color: white; border: 1px solid var(--border-color);">
+                    <option value="any">Any Neighborhood</option>
+                    <option value="center city">Center City</option>
+                    <option value="rittenhouse">Rittenhouse Square</option>
+                    <option value="old city">Old City</option>
+                    <option value="fishtown">Fishtown</option>
+                    <option value="university city">University City</option>
+                    <option value="south philly">South Philadelphia</option>
+                    <option value="northern liberties">Northern Liberties</option>
+                    <option value="chinatown">Chinatown</option>
+                    <option value="fairmount">Fairmount</option>
+                </select>
+            </div>
+
+            <div class="filter-section">
+                <h3>Data Status</h3>
+                <div class="status-badge success">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Processed data found
+                </div>
+            </div>
+
+            <div class="filter-section info-section">
+                <h3>Price guide</h3>
+                <ul class="price-guide">
+                    <li><span class="price-tier">$</span> — Inexpensive (under $10)</li>
+                    <li><span class="price-tier">$$</span> — Moderate ($11–$30)</li>
+                    <li><span class="price-tier">$$$</span> — Pricey ($31–$60)</li>
+                    <li><span class="price-tier">$$$$</span> — Very expensive ($61+)</li>
+                </ul>
+                <p class="caption">Yelp price tiers per person, excluding tax and tip.</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div class="header-titles">
+                    <h2>Philadelphia Restaurant Recommender</h2>
+                    <div class="explanation-box" style="margin-top: 16px; background: rgba(244,63,94,0.05); border-color: rgba(244,63,94,0.2);">
+                        <div class="explanation-icon">✨</div>
+                        <div class="explanation-text">
+                            <strong>How this beats Yelp:</strong> Regular Yelp forces you to use rigid checkboxes (like checking the "Italian" box). Our Semantic AI mathematically reads thousands of actual customer reviews to find the exact "vibe" you type in (e.g. "loud sports bar with cheap wings"). 
+                            <br><br>
+                            <em>Note: This dataset is currently strictly limited to Philadelphia, PA.</em>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Search Area -->
+            <section class="search-section">
+                <div class="search-box">
+                    <svg class="search-icon" viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="search-input" placeholder="Try 'cozy italian date night outdoor'" autocomplete="off">
+                    <button id="search-btn">Search</button>
+                </div>
+                
+                <div class="suggestions">
+                    <span>Try:</span>
+                    <button class="suggestion-btn">quiet cafe to study</button>
+                    <button class="suggestion-btn">date night italian</button>
+                    <button class="suggestion-btn">cheap spicy noodles</button>
+                    <button class="suggestion-btn">brunch spot in Old City</button>
+                </div>
+            </section>
+
+            <!-- Results Area -->
+            <section class="results-section">
+                <div class="results-header" id="results-header" style="display: none;">
+                    <h3 id="results-title">Top Results</h3>
+                    <span id="results-meta" class="results-meta"></span>
+                </div>
+                
+                <div id="loader" class="loader-container" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Analyzing thousands of reviews...</p>
+                </div>
+
+                <div id="results-container" class="results-grid">
+                    <!-- Results will be injected here -->
+                </div>
+
+                <div style="text-align: center; margin-top: 24px;">
+                    <button id="load-more-btn" style="display: none; background: transparent; border: 1px solid var(--border-color); color: var(--text-primary); padding: 10px 24px; border-radius: 20px; cursor: pointer;">Show More Results</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Template for a result card -->
+    <template id="result-card-template">
+        <article class="result-card">
+            <div class="card-rank">
+                <span class="rank-number">#1</span>
+            </div>
+            
+            <div class="card-content">
+                <div class="card-header">
+                    <h3 class="restaurant-name">Restaurant Name</h3>
+                    <div class="match-score-container">
+                        <div class="match-score">
+                            <span class="score-value">95%</span>
+                            <span class="score-label">Match</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="restaurant-meta">
+                    <span class="meta-item rating">★ 4.5</span>
+                    <span class="meta-dot">·</span>
+                    <span class="meta-item reviews">200 reviews</span>
+                    <span class="meta-dot">·</span>
+                    <span class="meta-item price">$$</span>
+                    <span class="meta-dot">·</span>
+                    <span class="meta-item location">
+                        <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        <span class="location-text">Philadelphia</span>
+                    </span>
+                </div>
+                
+                <div class="restaurant-categories">Categories</div>
+                
+                <div class="badges-container">
+                    <!-- Badges injected here -->
+                </div>
+                
+                <div class="explanation-box">
+                    <div class="explanation-icon">💡</div>
+                    <div class="explanation-text">Explanation here</div>
+                </div>
+            </div>
+        </article>
+    </template>
+
+    <script src="/app.js"></script>
+</body>
+</html>

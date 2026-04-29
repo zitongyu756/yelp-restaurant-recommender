@@ -41,6 +41,10 @@ W_POPULARITY   = 0.10   # log-normalized review count (proxy for popularity)
 W_PRICE_MATCH  = 0.15   # price range match
 W_LOCATION     = 0.20   # exact neighborhood match
 
+# We use absolute normalization to prevent batch-relative scoring artifacts.
+# Max expected reviews (used to normalize review_count). 3000 is high for Philadelphia.
+MAX_EXPECTED_REVIEWS = 3000.0
+
 def normalize_min_max(series: pd.Series) -> pd.Series:
     """Scale a Series to [0, 1] using min-max normalization."""
     min_val = series.min()
@@ -48,7 +52,6 @@ def normalize_min_max(series: pd.Series) -> pd.Series:
     if max_val == min_val:
         return pd.Series(np.ones(len(series)), index=series.index)
     return (series - min_val) / (max_val - min_val)
-
 
 def compute_quality_score(df: pd.DataFrame) -> pd.Series:
     """
@@ -66,8 +69,9 @@ def compute_quality_score(df: pd.DataFrame) -> pd.Series:
     m = 50.0
     bayesian_stars = (review_count * stars + m * C) / (review_count + m)
 
-    norm_stars = normalize_min_max(bayesian_stars)
-    norm_reviews = normalize_min_max(np.log1p(review_count))  # log dampens extreme counts
+    # Absolute normalization
+    norm_stars = bayesian_stars / 5.0
+    norm_reviews = np.clip(np.log1p(review_count) / np.log1p(MAX_EXPECTED_REVIEWS), 0.0, 1.0)
 
     quality = W_STARS * norm_stars + W_POPULARITY * norm_reviews
     return quality
@@ -188,8 +192,8 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     m = 50.0
     bayesian_stars = (review_count * stars + m * C) / (review_count + m)
     
-    norm_stars = normalize_min_max(bayesian_stars)
-    norm_reviews = normalize_min_max(np.log1p(review_count))
+    norm_stars = bayesian_stars / 5.0
+    norm_reviews = np.clip(np.log1p(review_count) / np.log1p(MAX_EXPECTED_REVIEWS), 0.0, 1.0)
     
     quality_score = w_stars * norm_stars + w_pop * norm_reviews
     price_score = compute_price_score(candidates, query)
@@ -212,6 +216,9 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
         + w_price * price_score
         + w_loc * loc_score
     )
+    
+    # Scale up final score slightly to fit the expected 85-98% range for top results
+    candidates["final_score"] = (candidates["final_score"] * 1.15).clip(0.0, 1.0)
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)
 

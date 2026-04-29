@@ -45,37 +45,53 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Premium CSS Styling
+# Premium CSS Styling - Tailored for our App (Dark Mode Compatible)
 st.markdown("""
     <style>
-    /* Modern font and subtle background */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
     }
     
-    /* Enhance the card borders */
-    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"] {
-        border-radius: 12px;
-        transition: all 0.3s ease;
+    /* Clean Search Bar */
+    .stTextInput input {
+        border-radius: 12px !important;
+        padding: 14px 20px !important;
+        border: 1px solid rgba(128, 128, 128, 0.3) !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+        font-size: 1.05rem !important;
+        transition: all 0.2s ease;
+        background-color: transparent !important;
     }
-    div[data-testid="stVerticalBlock"] div[data-testid="stVerticalBlock"]:hover {
-        box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    .stTextInput input:focus {
+        border-color: #FF4B4B !important;
+        box-shadow: 0 4px 12px rgba(255, 75, 75, 0.2) !important;
+    }
+    
+    /* Elegant Result Cards (targets only bordered containers) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 16px !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        border: 1px solid rgba(128, 128, 128, 0.2) !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         transform: translateY(-2px);
     }
     
     /* Stylize the metrics */
     [data-testid="stMetricValue"] {
-        font-weight: 800;
-        color: #FF4B4B; /* Yelp red accent */
+        font-weight: 700;
+        color: #FF4B4B;
     }
     
     /* Badge styling */
     .feature-badge {
         display: inline-block;
-        padding: 4px 10px;
-        margin-right: 6px;
-        margin-bottom: 6px;
+        padding: 4px 12px;
+        margin-right: 8px;
+        margin-bottom: 8px;
         border-radius: 20px;
         background: rgba(255, 75, 75, 0.1);
         color: #FF4B4B;
@@ -295,6 +311,9 @@ if search_clicked and query.strip():
             # Semantic Similarity Score (the pure AI match)
             semantic_score = int(row.get("similarity_score", 0) * 100)
             
+            # Format rank to be 01, 02, etc.
+            rank_str = f"{rank:02d}"
+            
             with st.container(border=True):
                 col_rank, col_info, col_metrics = st.columns([1, 6, 2])
                 with col_rank:
@@ -302,7 +321,10 @@ if search_clicked and query.strip():
                 with col_info:
                     st.markdown(f"### {row.get('name', 'Unknown')}")
                     meta_parts = [stars_display, review_display]
-                    meta_parts.append(price_display)
+                    
+                    if price_display:
+                        meta_parts.append(price_display)
+                        
                     neighborhood = str(row.get("neighborhood", "") or "")
                     address = str(row.get("address", "") or "")
                     city = str(row.get("city", "") or "")
@@ -313,6 +335,7 @@ if search_clicked and query.strip():
                         meta_parts.append(f"📍 {neighborhood}")
                     elif city and city != "nan":
                         meta_parts.append(f"📍 {city}")
+                        
                     st.caption("  ·  ".join(meta_parts))
                     st.markdown(f"*{row.get('categories', '')}*")
                     
