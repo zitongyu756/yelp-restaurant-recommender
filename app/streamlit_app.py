@@ -210,9 +210,13 @@ if search_clicked and query.strip():
     st.divider()
 
     for rank, (_, row) in enumerate(results.iterrows(), start=1):
-        price_display = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}.get(
-            str(row.get("price_range", "")), ""
-        )
+        # price_range is stored as a float (1.0, 2.5, ...); round to the
+        # nearest integer tier before looking up the $ symbol.
+        try:
+            price_key = int(round(float(row.get("price_range"))))
+            price_display = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$"}.get(price_key, "")
+        except (TypeError, ValueError):
+            price_display = ""
         stars_display = f"{row.get('stars', '?')} ★"
         review_display = f"{int(row.get('review_count', 0)):,} reviews"
 
@@ -256,6 +260,15 @@ with st.sidebar:
             "python scripts/run_embed.py\n"
             "```"
         )
+    st.markdown("---")
+    st.markdown("**Price guide**")
+    st.markdown(
+        "- `$` — Inexpensive (under \\$10)\n"
+        "- `$$` — Moderate (\\$11–\\$30)\n"
+        "- `$$$` — Pricey (\\$31–\\$60)\n"
+        "- `$$$$` — Very expensive (\\$61+)"
+    )
+    st.caption("Yelp price tiers per person, excluding tax and tip.")
     st.markdown("---")
     st.markdown("**Model:** `all-MiniLM-L6-v2`")
     st.markdown(f"**Results shown:** {TOP_K_DISPLAY}")

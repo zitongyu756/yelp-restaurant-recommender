@@ -25,7 +25,7 @@ QUIET_KEYWORDS    = {"quiet", "calm", "peaceful", "study", "work"}
 ROMANTIC_KEYWORDS = {"romantic", "date", "date night", "intimate", "cozy"}
 LATE_KEYWORDS     = {"late", "late night", "midnight", "after midnight"}
 
-PRICE_LABEL = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}
+PRICE_LABEL = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$"}
 
 
 def _extract_query_keywords(query: str) -> set[str]:
@@ -34,7 +34,13 @@ def _extract_query_keywords(query: str) -> set[str]:
 
 
 def _price_label(price_range) -> str:
-    return PRICE_LABEL.get(str(price_range), "unknown price range")
+    # Yelp data stores price_range as floats (1.0, 2.5, 1.667, ...) so we
+    # round to the nearest integer tier before looking up the symbol.
+    try:
+        key = int(round(float(price_range)))
+    except (TypeError, ValueError):
+        return "unknown price range"
+    return PRICE_LABEL.get(key, "unknown price range")
 
 
 def generate_explanation(row: pd.Series, query: str) -> str:
