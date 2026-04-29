@@ -52,12 +52,20 @@ def normalize_min_max(series: pd.Series) -> pd.Series:
 def compute_quality_score(df: pd.DataFrame) -> pd.Series:
     """
     Compute a quality score in [0, 1] from structured metadata.
-    Uses star rating and log review count.
+    Uses a Bayesian Average for star rating to prevent places with a single 
+    5-star review from unfairly outranking well-established places.
     """
     stars = pd.to_numeric(df["stars"], errors="coerce").fillna(0)
     review_count = pd.to_numeric(df["review_count"], errors="coerce").fillna(0)
 
-    norm_stars = normalize_min_max(stars)
+    # Bayesian Average for stars
+    # C = assumed global average rating (3.5 is typical for Yelp)
+    # m = confidence threshold (e.g., 50 reviews)
+    C = 3.5
+    m = 50.0
+    bayesian_stars = (review_count * stars + m * C) / (review_count + m)
+
+    norm_stars = normalize_min_max(bayesian_stars)
     norm_reviews = normalize_min_max(np.log1p(review_count))  # log dampens extreme counts
 
     quality = W_STARS * norm_stars + W_POPULARITY * norm_reviews
@@ -110,7 +118,7 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     Args:
         candidates: DataFrame returned by retrieve.retrieve().
                     Must contain columns: similarity_score, stars, review_count.
-        query: The original user query, used for price preference matching.
+        query: The original user query, used for price preference matching and dynamic weighting.
 
     Returns:
         DataFrame sorted by final_score descending, with a new 'final_score' column.
@@ -118,15 +126,49 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     if candidates.empty:
         return candidates
 
+    # Dynamic Weighting based on query intent
+    query_lower = query.lower()
+    
+    # Default weights
+    w_sim = W_SIMILARITY
+    w_stars = W_STARS
+    w_pop = W_POPULARITY
+    w_price = W_PRICE_MATCH
+
+    # Check for popularity/review count intent
+    if any(kw in query_lower for kw in ["most reviews", "popular", "many reviews", "most reviewed"]):
+        w_pop = 0.60
+        w_sim = 0.20
+        w_stars = 0.10
+        w_price = 0.10
+
+    # Check for rating intent
+    elif any(kw in query_lower for kw in ["highest rated", "best rated", "top rated"]):
+        w_stars = 0.60
+        w_sim = 0.20
+        w_pop = 0.10
+        w_price = 0.10
+
     norm_similarity = normalize_min_max(candidates["similarity_score"])
-    quality_score = compute_quality_score(candidates)
+    
+    # Recompute quality score using dynamic weights instead of globals
+    stars = pd.to_numeric(candidates["stars"], errors="coerce").fillna(0)
+    review_count = pd.to_numeric(candidates["review_count"], errors="coerce").fillna(0)
+    C = 3.5
+    m = 50.0
+    bayesian_stars = (review_count * stars + m * C) / (review_count + m)
+    
+    norm_stars = normalize_min_max(bayesian_stars)
+    norm_reviews = normalize_min_max(np.log1p(review_count))
+    
+    quality_score = w_stars * norm_stars + w_pop * norm_reviews
     price_score = compute_price_score(candidates, query)
     
     candidates = candidates.copy()
     candidates["final_score"] = (
-        W_SIMILARITY * norm_similarity
-        + quality_score  # already includes W_STARS and W_POPULARITY weights
-        + W_PRICE_MATCH * price_score
+        w_sim * norm_similarity
+        + quality_score
+        + w_price * price_score
     )
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)

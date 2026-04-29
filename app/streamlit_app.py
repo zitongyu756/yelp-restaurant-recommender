@@ -140,7 +140,7 @@ def load_retrieve_module():
     return retrieve
 
 
-def run_search(query: str) -> pd.DataFrame:
+def run_search(query: str, min_stars: float = 0.0) -> pd.DataFrame:
     """
     Run the full retrieve → rerank → explain pipeline for a given query.
     Falls back to mock data if processed files don't exist yet.
@@ -152,10 +152,16 @@ def run_search(query: str) -> pd.DataFrame:
             icon="⚠️",
         )
         mock = get_mock_results(query)
+        if min_stars > 0:
+            mock = mock[mock["stars"] >= min_stars]
         return add_explanations(mock, query)
 
     retrieve_module = load_retrieve_module()
     candidates = retrieve_module.retrieve(query, top_k=TOP_K_RETRIEVE)
+    
+    if min_stars > 0:
+        candidates = candidates[candidates["stars"] >= min_stars].copy()
+
     reranked = rerank(candidates, query)
     top = reranked.head(TOP_K_DISPLAY)
     results = add_explanations(top, query)
@@ -203,46 +209,64 @@ search_clicked = st.button("Search", type="primary", use_container_width=True)
 # ---------------------------------------------------------------------------
 
 if search_clicked and query.strip():
-    with st.spinner("Finding restaurants..."):
-        results = run_search(query.strip())
+    with st.spinner("Finding the best restaurants..."):
+        # We'll pull the min_stars from session state if it exists, default to 0.0
+        min_stars = st.session_state.get("min_stars", 0.0)
+        results = run_search(query.strip(), min_stars)
 
-    st.markdown(f"### Top {len(results)} results for: *{query}*")
-    st.divider()
-
-    for rank, (_, row) in enumerate(results.iterrows(), start=1):
-        price_display = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}.get(
-            str(row.get("price_range", "")), ""
-        )
-        stars_display = f"{row.get('stars', '?')} ★"
-        review_display = f"{int(row.get('review_count', 0)):,} reviews"
-
-        with st.container():
-            col_rank, col_info = st.columns([1, 9])
-            with col_rank:
-                st.markdown(f"### {rank}")
-            with col_info:
-                st.markdown(f"#### {row.get('name', 'Unknown')}")
-                meta_parts = [stars_display, review_display]
-                if price_display:
-                    meta_parts.append(price_display)
-                neighborhood = str(row.get("neighborhood", "") or "")
-                city = str(row.get("city", "") or "")
-                location = neighborhood if neighborhood and neighborhood != "nan" else city
-                if location and location != "nan":
-                    meta_parts.append(f"📍 {location}")
-                st.caption("  ·  ".join(meta_parts))
-                st.markdown(f"*{row.get('categories', '')}*")
-                st.info(row.get("explanation", ""), icon="💡")
-
+    if results.empty:
+        st.warning("No restaurants found matching your criteria.")
+    else:
+        st.markdown(f"### Top {len(results)} results for: *{query}*")
         st.divider()
+
+        for rank, (_, row) in enumerate(results.iterrows(), start=1):
+            price_display = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}.get(
+                str(row.get("price_range", "")), ""
+            )
+            stars_display = f"{row.get('stars', '?')} ★"
+            review_display = f"{int(row.get('review_count', 0)):,} reviews"
+            
+            # Final score converted to a percentage
+            match_pct = int(row.get("final_score", 0) * 100)
+            
+            with st.container(border=True):
+                col_rank, col_info, col_score = st.columns([1, 7, 2])
+                with col_rank:
+                    st.markdown(f"## #{rank}")
+                with col_info:
+                    st.markdown(f"### {row.get('name', 'Unknown')}")
+                    meta_parts = [stars_display, review_display]
+                    if price_display:
+                        meta_parts.append(price_display)
+                    neighborhood = str(row.get("neighborhood", "") or "")
+                    city = str(row.get("city", "") or "")
+                    location = neighborhood if neighborhood and neighborhood != "nan" else city
+                    if location and location != "nan":
+                        meta_parts.append(f"📍 {location}")
+                    st.caption("  ·  ".join(meta_parts))
+                    st.markdown(f"*{row.get('categories', '')}*")
+                    st.info(row.get("explanation", ""), icon="💡")
+                with col_score:
+                    st.metric("Match Score", f"{match_pct}%")
+                    st.progress(match_pct / 100.0)
 
 elif search_clicked and not query.strip():
     st.error("Please enter a query before searching.")
 
 # ---------------------------------------------------------------------------
-# Sidebar: data status
+# Sidebar: data status & filters
 # ---------------------------------------------------------------------------
 with st.sidebar:
+    st.header("Search Filters")
+    st.slider(
+        "Minimum Star Rating", 
+        min_value=0.0, max_value=5.0, step=0.5, value=0.0,
+        key="min_stars"
+    )
+    
+    st.divider()
+    
     st.header("Data Status")
     if processed_data_exists():
         st.success("Processed data found ✓", icon="✅")
