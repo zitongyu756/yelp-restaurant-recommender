@@ -40,10 +40,6 @@ W_STARS        = 0.20   # normalized star rating
 W_POPULARITY   = 0.12   # log-normalized review count (proxy for popularity)
 W_PRICE_MATCH = 0.20          # price range match
 
-def _extract_query_keywords(query: str) -> set[str]:
-    """Lowercase and tokenize the query into a set of words."""
-    return set(re.findall(r"\b\w+\b", query.lower()))
-
 def normalize_min_max(series: pd.Series) -> pd.Series:
     """Scale a Series to [0, 1] using min-max normalization."""
     min_val = series.min()
@@ -69,24 +65,42 @@ def compute_quality_score(df: pd.DataFrame) -> pd.Series:
 
 def compute_price_score(df: pd.DataFrame, query: str) -> pd.Series:
     """
-    Compute a price score in [0, 1] from user query and price range.
+    Compute a price score in [0, 1] from user query and price range (1 to 4).
     """
     if not query:
         return pd.Series(np.ones(len(df)), index=df.index)
 
-    query_words = _extract_query_keywords(query)
-    wants_cheap = bool(query_words & CHEAP_KEYWORDS)
-    wants_expensive = bool(query_words & EXPENSIVE_KEYWORDS)
+    query_lower = query.lower()
+    
+    # Use regex to properly match multi-word phrases like "very expensive"
+    wants_cheap = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in CHEAP_KEYWORDS)
+    wants_moderate = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in MODERATE_KEYWORDS)
+    wants_expensive = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in EXPENSIVE_KEYWORDS)
+    wants_very_expensive = any(re.search(rf"\b{re.escape(kw)}\b", query_lower) for kw in VERY_EXPENSIVE_KEYWORDS)
 
-    if not wants_cheap and not wants_expensive:
+    ideal_prices = []
+    if wants_cheap:
+        ideal_prices.append(1.0)
+    if wants_moderate:
+        ideal_prices.append(2.0)
+    if wants_expensive:
+        ideal_prices.append(3.0)
+    if wants_very_expensive:
+        ideal_prices.append(4.0)
+
+    if not ideal_prices:
         return pd.Series(np.ones(len(df)), index=df.index)
 
     price = pd.to_numeric(df["price_range"], errors="coerce").fillna(2.0)
-    if wants_cheap:
-        score = 1.0 - ((price - 1.0) / 3.0)
-    else:
-        score = (price - 1.0) / 3.0
-    return score.clip(0, 1)
+    
+    scores = []
+    for ideal in ideal_prices:
+        # Score is 1.0 at ideal price, decreasing by 0.33 for each tier away
+        score = 1.0 - (np.abs(price - ideal) / 3.0)
+        scores.append(score)
+        
+    final_score = pd.concat(scores, axis=1).max(axis=1)
+    return final_score.clip(0, 1)
 
 def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     """
