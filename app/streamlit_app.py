@@ -266,14 +266,25 @@ if search_clicked and query.strip():
         results = run_search(query.strip(), min_stars)
 
     if results.empty:
-        st.warning("No restaurants found matching your criteria.")
+        st.warning(
+            "No matching restaurants found in the dataset. "
+            "Try lowering the minimum star rating or changing your keywords.",
+            icon="⚠️",
+        )
     else:
         st.markdown(f"### Top {len(results)} results for: *{query}*")
         st.divider()
 
         for rank, (_, row) in enumerate(results.iterrows(), start=1):
+            # price_range is stored as float string ("1.0", "2.0" etc.) in the CSV,
+            # so round to nearest int before looking up the symbol.
+            _pr = row.get("price_range", "")
+            try:
+                _pr_key = str(round(float(_pr)))
+            except (ValueError, TypeError):
+                _pr_key = ""
             price_display = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}.get(
-                str(row.get("price_range", "")), ""
+                _pr_key, "Price: Unknown"
             )
             stars_display = f"{row.get('stars', '?')} ★"
             review_display = f"{int(row.get('review_count', 0)):,} reviews"
@@ -291,8 +302,7 @@ if search_clicked and query.strip():
                 with col_info:
                     st.markdown(f"### {row.get('name', 'Unknown')}")
                     meta_parts = [stars_display, review_display]
-                    if price_display:
-                        meta_parts.append(price_display)
+                    meta_parts.append(price_display)
                     neighborhood = str(row.get("neighborhood", "") or "")
                     address = str(row.get("address", "") or "")
                     city = str(row.get("city", "") or "")

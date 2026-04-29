@@ -162,7 +162,8 @@ def extract_price_from_reviews(reviews: list[str]) -> float:
     for price_level, phrases in PRICE_SIGNALS.items():
         for phrase in phrases:
             # Convert '.' wildcard shorthand (e.g. wallet.friendly) to \w* regex
-            pattern = rf"\b{phrase.replace('.', r'\w*')}\b"
+            wildcard = phrase.replace(".", r"\w*")
+            pattern = rf"\b{wildcard}\b"
             for match in re.finditer(pattern, combined):
                 # Check the 4 words immediately before the match for negators
                 preceding_text = combined[max(0, match.start() - 35) : match.start()]

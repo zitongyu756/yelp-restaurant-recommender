@@ -276,7 +276,9 @@ def generate_explanation(row: pd.Series, query: str) -> str:
     if not parts:
         parts.append("Closely matched your query based on reviews and profile.")
 
-    return " ".join(parts)
+    # Two trailing spaces before \n = markdown hard line break, so each segment
+    # renders on its own line inside st.info() / st.markdown().
+    return "  \n".join(parts)
 
 
 def add_explanations(df: pd.DataFrame, query: str) -> pd.DataFrame:
@@ -291,5 +293,11 @@ def add_explanations(df: pd.DataFrame, query: str) -> pd.DataFrame:
         The same DataFrame with an added 'explanation' column.
     """
     df = df.copy()
-    df["explanation"] = df.apply(lambda row: generate_explanation(row, query), axis=1)
+    # Use a list comprehension instead of df.apply() to avoid a pandas edge case
+    # where apply() on an empty DataFrame returns a DataFrame instead of a Series,
+    # which would crash with "Cannot set a DataFrame with multiple columns to the
+    # single column explanation".
+    df["explanation"] = [
+        generate_explanation(row, query) for _, row in df.iterrows()
+    ]
     return df
