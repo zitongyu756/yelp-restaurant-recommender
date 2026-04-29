@@ -27,7 +27,7 @@ QUIET_KEYWORDS    = {"quiet", "calm", "peaceful", "study", "work"}
 ROMANTIC_KEYWORDS = {"romantic", "date", "date night", "intimate", "cozy"}
 LATE_KEYWORDS     = {"late", "late night", "midnight", "after midnight"}
 
-PRICE_LABEL = {"1": "$", "2": "$$", "3": "$$$", "4": "$$$$"}
+PRICE_LABEL = {1: "$", 2: "$$", 3: "$$$", 4: "$$$$"}
 
 # Human-readable names for the K-Means clusters (0-14)
 CLUSTER_NAMES = {

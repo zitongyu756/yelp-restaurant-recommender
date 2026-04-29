@@ -60,15 +60,53 @@ def embed_texts(model: SentenceTransformer, texts: list[str]) -> np.ndarray:
     norms = np.where(norms == 0, 1e-10, norms)
     return embeddings / norms
 
+    partial_arrays = []
+    for idx, chunk in enumerate(chunks):
+        logger.info("  chunk %d/%d (%d texts)...", idx + 1, len(chunks), len(chunk))
+        chunk_emb = model.encode(
+            chunk,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+            batch_size=64,
+        ).astype(np.float32)
+
+        # save partial so a crash mid-run doesn't lose all progress
+        if output_npy is not None:
+            partial_path = Path(output_npy).with_name(
+                Path(output_npy).stem + f"_chunk_{idx}.npy"
+            )
+            np.save(str(partial_path), chunk_emb)
+            logger.info("  saved partial: %s", partial_path)
+
+        partial_arrays.append(chunk_emb)
+
+    embeddings = np.concatenate(partial_arrays, axis=0)
+
+    # clean up partial files now that the full array is assembled
+    if output_npy is not None:
+        for idx in range(len(chunks)):
+            partial_path = Path(output_npy).with_name(
+                Path(output_npy).stem + f"_chunk_{idx}.npy"
+            )
+            if partial_path.exists():
+                partial_path.unlink()
+        logger.info("Cleaned up %d partial chunk files", len(chunks))
+
+    return embeddings
 
 def run(
     profiles_csv: Path = PROFILES_CSV,
     output_npy: Path = EMBEDDINGS_NPY,
+    chunk_size: int = 5000,
 ) -> np.ndarray:
     """
     Full embedding pipeline.
     Loads profiles, embeds them, and saves the result.
     Returns the embedding matrix.
+
+    Uses chunked embedding when the dataset exceeds chunk_size rows, so a
+    very large dataset won't OOM and partial progress is saved to disk.
+    Set chunk_size smaller on machines with limited RAM.
     """
     profiles_csv = Path(profiles_csv)
     output_npy = Path(output_npy)
@@ -79,6 +117,14 @@ def run(
     model = load_model()
     embeddings = embed_texts(model, texts)
 
+     # use chunked path for large datasets, simple path for small ones
+    if len(texts) > chunk_size:
+        embeddings = embed_texts_chunked(
+            model, texts, chunk_size=chunk_size, output_npy=output_npy
+        )
+    else:
+        embeddings = embed_texts(model, texts)
+    
     save_embeddings(embeddings, output_npy)
     logger.info(
         "Saved embeddings %s to %s", str(embeddings.shape), output_npy
@@ -86,6 +132,3 @@ def run(
 
     return embeddings
 
-
-# TODO: If the dataset is very large, consider batching into chunks and saving
-#       partial .npy files to avoid running out of memory.

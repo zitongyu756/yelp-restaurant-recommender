@@ -364,6 +364,15 @@ with st.sidebar:
             "```"
         )
     st.markdown("---")
+    st.markdown("**Price guide**")
+    st.markdown(
+        "- `$` — Inexpensive (under \\$10)\n"
+        "- `$$` — Moderate (\\$11–\\$30)\n"
+        "- `$$$` — Pricey (\\$31–\\$60)\n"
+        "- `$$$$` — Very expensive (\\$61+)"
+    )
+    st.caption("Yelp price tiers per person, excluding tax and tip.")
+    st.markdown("---")
     st.markdown("**Model:** `all-MiniLM-L6-v2`")
     st.markdown(f"**Results shown:** {TOP_K_DISPLAY}")
     st.markdown(f"**Candidates retrieved:** {TOP_K_RETRIEVE}")
