@@ -33,15 +33,20 @@ logger.info("FastAPI backend initialized.")
 # Keywords that signal the user cares about popularity / review count
 POPULARITY_KEYWORDS = ["most reviews", "popular", "many reviews", "most reviewed"]
 
+
 @app.get("/api/search")
 def search(
     q: str = Query(..., min_length=1),
     min_stars: float = Query(0.0),
-    top_k: int = Query(30)
+    top_k: int = Query(30),
+    cuisine: Optional[str] = Query(None),
 ):
     try:
-        # 1. Vector Search
-        candidates = retrieve(q, top_k=100)
+        # 1. Vector Search — `cuisine` is a user-selected soft filter; rows whose
+        #    `categories` don't contain this substring get a small score penalty.
+        if cuisine:
+            logger.info("Cuisine filter active: %s", cuisine)
+        candidates = retrieve(q, top_k=100, cuisine=cuisine)
         
         # 2. If user wants "most reviews", supplement with the actual most-reviewed
         #    restaurants from the full dataset so they're guaranteed to be in the pool.

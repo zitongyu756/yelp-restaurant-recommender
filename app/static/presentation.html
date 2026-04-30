@@ -175,6 +175,7 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <p>2. The user's query is embedded using the same model → another 384-D vector.</p>
 <p>3. We compute the <span class="accent-b">Dot Product</span> between the query vector and every restaurant vector. The highest scores = the most relevant restaurants.</p>
 <p>4. Because all vectors are L2-normalized, Dot Product equals Cosine Similarity.</p>
+<p>5. <span class="accent-g">Soft Cuisine Filter:</span> if the user picks a cuisine from the sidebar, restaurants whose <code>categories</code> don't match get a small <strong>−0.15</strong> penalty <em>before</em> top-k — biasing the pool toward that cuisine without hard-excluding strong semantic matches.</p>
 </div>
 </div>
 <div class="col">
