@@ -8,7 +8,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import our recommender logic
-from src.retrieve import retrieve
+from src.retrieve import retrieve, _load_resources, _profiles_df, embed_query
+from src.similarity import dot_product_one_to_many
 from src.rerank import rerank
 from src.explain import add_explanations
 
@@ -29,6 +30,9 @@ app.add_middleware(
 # We let retrieve() handle caching internally
 logger.info("FastAPI backend initialized.")
 
+# Keywords that signal the user cares about popularity / review count
+POPULARITY_KEYWORDS = ["most reviews", "popular", "many reviews", "most reviewed"]
+
 @app.get("/api/search")
 def search(
     q: str = Query(..., min_length=1),
@@ -37,17 +41,41 @@ def search(
 ):
     try:
         # 1. Vector Search
-        # Fetch up to 100 candidates so the reranker has a deep pool to find the most reviewed items.
         candidates = retrieve(q, top_k=100)
         
-        # 2. Rerank
+        # 2. If user wants "most reviews", supplement with the actual most-reviewed
+        #    restaurants from the full dataset so they're guaranteed to be in the pool.
+        query_lower = q.lower()
+        if any(kw in query_lower for kw in POPULARITY_KEYWORDS):
+            _load_resources()
+            import src.retrieve as ret_mod
+            full_df = ret_mod._profiles_df
+            embeddings = ret_mod._embeddings
+            
+            # Sort the entire dataset by review count and take top 50
+            top_reviewed = full_df.nlargest(50, "review_count").copy()
+            
+            # Compute real similarity scores for these popular restaurants
+            query_vec = embed_query(q)
+            all_scores = dot_product_one_to_many(query_vec, embeddings)
+            top_reviewed_indices = top_reviewed.index.tolist()
+            top_reviewed["similarity_score"] = all_scores[top_reviewed_indices]
+            top_reviewed = top_reviewed.reset_index(drop=True)
+            
+            # Merge with semantic candidates, removing duplicates
+            import pandas as pd
+            candidates = pd.concat([candidates, top_reviewed], ignore_index=True)
+            candidates = candidates.drop_duplicates(subset=["business_id"], keep="first").reset_index(drop=True)
+            logger.info("Popularity intent detected — merged top-reviewed restaurants into pool (%d total)", len(candidates))
+        
+        # 3. Rerank
         reranked = rerank(candidates, q)
         
-        # 3. Filter by stars
+        # 4. Filter by stars
         if min_stars > 0:
             reranked = reranked[reranked["stars"] >= min_stars]
             
-        # 4. Explanations
+        # 5. Explanations
         top_results = reranked.head(top_k).copy()
         top_results = add_explanations(top_results, q)
         

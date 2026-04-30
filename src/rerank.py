@@ -35,11 +35,11 @@ VERY_EXPENSIVE_KEYWORDS = {"very expensive", "overpriced", "luxury"}
 # ---------------------------------------------------------------------------
 # Reranking weights — must sum to 1.0 for interpretability (not required)
 # ---------------------------------------------------------------------------
-W_SIMILARITY   = 0.40   # semantic similarity to the query
-W_STARS        = 0.15   # normalized star rating
+W_SIMILARITY   = 0.45   # semantic similarity to the query
+W_STARS        = 0.25   # normalized star rating (high weight to prevent low-rated places from ranking #1)
 W_POPULARITY   = 0.10   # log-normalized review count (proxy for popularity)
-W_PRICE_MATCH  = 0.15   # price range match
-W_LOCATION     = 0.20   # exact neighborhood match
+W_PRICE_MATCH  = 0.10   # price range match
+W_LOCATION     = 0.10   # exact neighborhood match
 
 # We use absolute normalization to prevent batch-relative scoring artifacts.
 # Max expected reviews (used to normalize review_count). 3000 is high for Philadelphia.
@@ -175,13 +175,13 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
         w_price = 0.10
         w_loc = 0.15
 
-    # Check for rating intent
-    elif any(kw in query_lower for kw in ["highest rated", "best rated", "top rated"]):
-        w_stars = 0.50
-        w_sim = 0.15
-        w_pop = 0.10
+    # Check for rating intent — "best" is a strong quality signal
+    elif any(kw in query_lower for kw in ["highest rated", "best rated", "top rated"]) or query_lower.startswith("best "):
+        w_stars = 0.45
+        w_sim = 0.20
+        w_pop = 0.15
         w_price = 0.10
-        w_loc = 0.15
+        w_loc = 0.10
 
     norm_similarity = normalize_min_max(candidates["similarity_score"])
     
@@ -215,10 +215,7 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
         + quality_score
         + w_price * price_score
         + w_loc * loc_score
-    )
-    
-    # Scale up final score slightly to fit the expected 85-98% range for top results
-    candidates["final_score"] = (candidates["final_score"] * 1.15).clip(0.0, 1.0)
+    ).clip(0.0, 1.0)
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)
 

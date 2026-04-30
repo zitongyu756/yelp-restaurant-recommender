@@ -216,11 +216,11 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <div class="tag">Core Technology 3</div>
 <h2>Multi-Signal Reranking Engine</h2>
 <p class="sub">Pure semantic similarity can surface relevant-but-low-quality places. Our reranker blends 5 weighted signals into a single final score.</p>
-<div class="wt"><span class="wt-l">Similarity</span><div class="wt-bg"><div class="wt-bar" style="width:40%;background:#e11d48"></div></div><span class="wt-v" style="color:#e11d48">40%</span></div>
-<div class="wt"><span class="wt-l">Location</span><div class="wt-bg"><div class="wt-bar" style="width:20%;background:#2563eb"></div></div><span class="wt-v" style="color:#2563eb">20%</span></div>
-<div class="wt"><span class="wt-l">Star Rating</span><div class="wt-bg"><div class="wt-bar" style="width:15%;background:#d97706"></div></div><span class="wt-v" style="color:#d97706">15%</span></div>
-<div class="wt"><span class="wt-l">Price Match</span><div class="wt-bg"><div class="wt-bar" style="width:15%;background:#059669"></div></div><span class="wt-v" style="color:#059669">15%</span></div>
+<div class="wt"><span class="wt-l">Similarity</span><div class="wt-bg"><div class="wt-bar" style="width:45%;background:#e11d48"></div></div><span class="wt-v" style="color:#e11d48">45%</span></div>
+<div class="wt"><span class="wt-l">Star Rating</span><div class="wt-bg"><div class="wt-bar" style="width:25%;background:#d97706"></div></div><span class="wt-v" style="color:#d97706">25%</span></div>
 <div class="wt"><span class="wt-l">Popularity</span><div class="wt-bg"><div class="wt-bar" style="width:10%;background:#7c3aed"></div></div><span class="wt-v" style="color:#7c3aed">10%</span></div>
+<div class="wt"><span class="wt-l">Price Match</span><div class="wt-bg"><div class="wt-bar" style="width:10%;background:#059669"></div></div><span class="wt-v" style="color:#059669">10%</span></div>
+<div class="wt"><span class="wt-l">Location</span><div class="wt-bg"><div class="wt-bar" style="width:10%;background:#2563eb"></div></div><span class="wt-v" style="color:#2563eb">10%</span></div>
 <div class="row">
 <div class="card col"><h3>Bayesian Average</h3><p>We don't trust raw star ratings. A 5.0★ with 1 review is inflated. Our Bayesian Average anchors all ratings toward a global mean of 3.5 with a confidence threshold of 50 reviews: <code>B = (n·s + m·C)/(n+m)</code></p></div>
 <div class="card col"><h3>Log Popularity</h3><p>Review counts are log-normalized against an absolute ceiling of 3,000 reviews: <code>log(1+count)/log(1+3000)</code>. This prevents a restaurant with 5,000 reviews from completely dominating one with 500.</p></div>
@@ -237,11 +237,12 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <h3>📊 Popularity Intent</h3>
 <p>Keywords: <em>"most reviews", "popular", "most reviewed"</em></p>
 <p>→ Popularity weight jumps to <span class="accent">50%</span>, similarity drops to 15%</p>
+<p>→ API also injects the <strong>50 most-reviewed restaurants</strong> from the full database into the candidate pool, guaranteeing the truly most popular places are always considered.</p>
 </div>
 <div class="card col" style="border-top:3px solid #d97706">
-<h3>⭐ Rating Intent</h3>
-<p>Keywords: <em>"highest rated", "best rated", "top rated"</em></p>
-<p>→ Star rating weight jumps to <span style="color:#d97706;font-weight:700">50%</span></p>
+<h3>⭐ Quality Intent</h3>
+<p>Triggers: <em>"best ...", "highest rated", "top rated"</em></p>
+<p>→ Star rating weight jumps to <span style="color:#d97706;font-weight:700">45%</span>, preventing low-rated places from ranking high even if semantically relevant</p>
 </div>
 <div class="card col" style="border-top:3px solid #059669">
 <h3>💰 Price Intent</h3>
@@ -253,7 +254,7 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <h3>🧠 Smart Weight Reallocation</h3>
 <p>If a signal is unused (e.g., no location mentioned, no price preference), its weight is <strong>automatically redistributed</strong> to boost the semantic similarity signal. This prevents unused signals from diluting the overall Match Score.</p>
 </div>
-<div class="ex"><p>Query: <em>"cafe with the most reviews"</em> → The system detects "most reviews" as a popularity intent, shifts 50% weight to review count, and returns restaurants sorted primarily by how many people have reviewed them — while still remaining semantically relevant to "cafe".</p></div>
+<div class="ex"><p>Query: <em>"best cafe with the most reviews"</em> → The system detects both "best" (quality intent) and "most reviews" (popularity intent). Popularity takes priority: the API injects the top 50 most-reviewed restaurants into the pool, then the reranker shifts 50% weight to review count — ensuring the most popular, well-reviewed cafes rise to the top.</p></div>
 </div>
 
 <!-- 8: ARCHITECTURE -->
@@ -273,7 +274,7 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <div class="s" style="padding-bottom:20px">
 <div class="tag">Live Demonstration</div>
 <h2>Try It Yourself</h2>
-<p class="sub">Search for anything: <strong>"date night italian in Rittenhouse"</strong>, <strong>"cheap spicy noodles"</strong>, or <strong>"cafe with most reviews"</strong>.</p>
+<p class="sub">Search for anything: <strong>"romantic dinner for anniversary"</strong>, <strong>"best cafe with the most reviews"</strong>, or <strong>"lively bar to watch the game"</strong>.</p>
 <div class="demo-frame" id="demo-area">
 <iframe src="/" id="demo-iframe" style="display:none" onload="this.style.display='block';document.getElementById('demo-fallback').style.display='none'"></iframe>
 <div id="demo-fallback" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;background:#fafafa">
