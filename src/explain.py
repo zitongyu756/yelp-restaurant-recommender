@@ -37,15 +37,15 @@ CLUSTER_NAMES = {
     3: "Bakeries & Desserts",
     4: "Cafes & Coffee",
     5: "Sandwiches & Cheesesteaks",
-    6: "Indian & Middle Eastern",
+    6: "Mediterranean & Middle Eastern",
     7: "Mexican & Latin",
-    8: "Japanese & Sushi",
+    8: "Delis & Hoagies",
     9: "Pizza & Casual Italian",
-    10: "Italian & Specialty Food",
-    11: "Delis & Brunch",
-    12: "Lounges & Entertainment",
-    13: "Seafood & Soul Food",
-    14: "Brunch & Modern American"
+    10: "Pizza & Italian",
+    11: "Modern Italian & Mediterranean",
+    12: "Brunch & Diners",
+    13: "Japanese & Sushi",
+    14: "Modern American & Bars",
 }
 
 # Generic filler phrases that add no information value — sentences containing
