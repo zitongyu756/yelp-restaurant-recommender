@@ -12,13 +12,17 @@ Unlike traditional filter-based search engines (like the generic Yelp app), this
 
 1. **Semantic Search via NLP embeddings:**
    Instead of just keyword matching, the app distills the sentiment of up to 40 customer reviews per restaurant into dense keywords and embeddings (using `all-MiniLM-L6-v2`).
-2. **Dynamic Weight Reallocation (Reranking):**
-   The system calculates an "Overall Match Score" by blending Semantic Similarity, Bayesian Average Star Rating, Popularity, Price, and Exact Location match. If you omit price or location from your query, the algorithm dynamically re-allocates those weights back to the semantic score so you aren't unfairly penalized!
-3. **Custom K-Means Clustering (Algorithm from Scratch):**
+2. **Intent Detection:**
+   Dynamically adjusts weight distributions by detecting "quality" (e.g., "best") or "popularity" search intents within the user's query, seamlessly supplementing semantic search.
+3. **Dynamic Weight Reallocation & Quality Floor Penalty:**
+   The system calculates an "Overall Match Score" by blending Semantic Similarity, Bayesian Average Star Rating, Popularity, Price, and Exact Location match. Low-rated establishments receive a quality floor penalty. If you omit price or location from your query, the algorithm dynamically and proportionally re-allocates those weights back to the semantic score to prevent score dilution!
+4. **Custom K-Means Clustering (Algorithm from Scratch):**
    We implemented a vectorized K-Means clustering algorithm from scratch using NumPy to group restaurants into 15 distinct "Vibe Categories" based purely on review semantics. 
-4. **Diversity Penalty:**
+5. **Diversity Penalty:**
    The reranker applies a penalty if it tries to recommend too many restaurants from the same "Vibe Cluster" sequentially, ensuring a varied set of results.
-5. **Extractive Summarization:**
+6. **Cuisine Soft Filter:**
+   A user-selectable cuisine filter applies a soft penalty rather than a rigid exclusion, ensuring that strong semantic intent is never overridden.
+7. **Extractive Summarization:**
    The UI generates a "Why this matches" explanation blurb by algorithmically finding the highest-value sentences in the reviews and bolding the exact words that overlap with your query.
 
 ---
@@ -27,6 +31,8 @@ Unlike traditional filter-based search engines (like the generic Yelp app), this
 
 - `app/`
   - `streamlit_app.py`: The beautiful, premium web interface.
+  - `api.py`: FastAPI backend endpoint.
+  - `static/`: HTML/JS/CSS static assets and the interactive project presentation (`presentation.html`).
 - `data/`
   - `raw/`: Original Yelp JSON files (excluded from Git).
   - `processed/`: Filtered datasets, restaurant profiles, and `.npy` embedding matrices.
