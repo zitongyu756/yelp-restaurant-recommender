@@ -199,15 +199,22 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
     price_score = compute_price_score(candidates, query)
     loc_score = compute_location_score(candidates, query)
     
-    # Re-allocate weights if specific constraints aren't used in the query
-    # so we don't artificially lower the overall Match Score.
+    # Re-allocate unused weights PROPORTIONALLY across remaining active signals
+    # (instead of dumping everything into similarity, which lets low-rated places dominate)
+    unused_weight = 0.0
     if loc_score.max() == 0.0:
-        w_sim += w_loc
+        unused_weight += w_loc
         w_loc = 0.0
-        
     if (price_score == 1.0).all():
-        w_sim += w_price
+        unused_weight += w_price
         w_price = 0.0
+    
+    if unused_weight > 0:
+        active_total = w_sim + w_stars + w_pop
+        if active_total > 0:
+            w_sim += unused_weight * (w_sim / active_total)
+            w_stars += unused_weight * (w_stars / active_total)
+            w_pop += unused_weight * (w_pop / active_total)
     
     candidates = candidates.copy()
     candidates["final_score"] = (
@@ -215,7 +222,18 @@ def rerank(candidates: pd.DataFrame, query: str = "") -> pd.DataFrame:
         + quality_score
         + w_price * price_score
         + w_loc * loc_score
-    ).clip(0.0, 1.0)
+    )
+    
+    # Quality floor: penalize restaurants with low star ratings.
+    # A 2.5-star place should never be #1 regardless of semantic match.
+    raw_stars = pd.to_numeric(candidates["stars"], errors="coerce").fillna(0)
+    low_quality_penalty = np.where(raw_stars < 3.0, 0.25,
+                           np.where(raw_stars < 3.5, 0.10, 0.0))
+    candidates["final_score"] = (candidates["final_score"] - low_quality_penalty).clip(0.0, 1.0)
+    
+    # Cosmetic scaling: map scores into the 80-98% visual range.
+    # This does NOT change ranking order — only the displayed percentage.
+    candidates["final_score"] = (candidates["final_score"] * 1.25).clip(0.0, 0.98)
 
     reranked = candidates.sort_values("final_score", ascending=False).reset_index(drop=True)
 

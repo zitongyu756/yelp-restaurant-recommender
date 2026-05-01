@@ -223,8 +223,8 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <div class="wt"><span class="wt-l">Price Match</span><div class="wt-bg"><div class="wt-bar" style="width:10%;background:#059669"></div></div><span class="wt-v" style="color:#059669">10%</span></div>
 <div class="wt"><span class="wt-l">Location</span><div class="wt-bg"><div class="wt-bar" style="width:10%;background:#2563eb"></div></div><span class="wt-v" style="color:#2563eb">10%</span></div>
 <div class="row">
-<div class="card col"><h3>Bayesian Average</h3><p>We don't trust raw star ratings. A 5.0★ with 1 review is inflated. Our Bayesian Average anchors all ratings toward a global mean of 3.5 with a confidence threshold of 50 reviews: <code>B = (n·s + m·C)/(n+m)</code></p></div>
-<div class="card col"><h3>Log Popularity</h3><p>Review counts are log-normalized against an absolute ceiling of 3,000 reviews: <code>log(1+count)/log(1+3000)</code>. This prevents a restaurant with 5,000 reviews from completely dominating one with 500.</p></div>
+<div class="card col"><h3>Bayesian Average</h3><p>A 5.0★ with 1 review is inflated. Our Bayesian Average anchors all ratings toward a global mean of 3.5: <code>B = (n·s + m·C)/(n+m)</code></p></div>
+<div class="card col"><h3>Quality Floor</h3><p>Restaurants below <strong>3.0 stars</strong> receive a <span class="accent">-25% penalty</span>. Between 3.0–3.5 stars: <span style="color:#d97706;font-weight:700">-10% penalty</span>. A 2.5-star place can never be #1.</p></div>
 </div>
 </div>
 
@@ -252,8 +252,8 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 </div>
 </div>
 <div class="card" style="margin-top:16px;border-left:4px solid #2563eb">
-<h3>🧠 Smart Weight Reallocation</h3>
-<p>If a signal is unused (e.g., no location mentioned, no price preference), its weight is <strong>automatically redistributed</strong> to boost the semantic similarity signal. This prevents unused signals from diluting the overall Match Score.</p>
+<h3>🧠 Proportional Weight Reallocation</h3>
+<p>If a signal is unused (e.g., no location or price in the query), its weight is <strong>proportionally redistributed</strong> across similarity, stars, and popularity — so star ratings always get a fair share of the unused weight, preventing low-rated places from dominating.</p>
 </div>
 <div class="ex"><p>Query: <em>"best cafe with the most reviews"</em> → The system detects both "best" (quality intent) and "most reviews" (popularity intent). Popularity takes priority: the API injects the top 50 most-reviewed restaurants into the pool, then the reranker shifts 50% weight to review count — ensuring the most popular, well-reviewed cafes rise to the top.</p></div>
 </div>
@@ -275,7 +275,8 @@ footer{display:flex;justify-content:space-between;align-items:center;padding:14p
 <div class="s" style="padding-bottom:20px">
 <div class="tag">Live Demonstration</div>
 <h2>Try It Yourself</h2>
-<p class="sub">Search for anything: <strong>"romantic dinner for anniversary"</strong>, <strong>"best cafe with the most reviews"</strong>, or <strong>"lively bar to watch the game"</strong>.</p>
+<p class="sub">Each "Try" button below the search bar demos a specific feature. Click them in order:<br>
+<strong>1.</strong> "romantic dinner" → Semantic vibe search &nbsp; <strong>2.</strong> "best brunch" → Quality intent &nbsp; <strong>3.</strong> "popular pizza" → Popularity intent &nbsp; <strong>4.</strong> "cheap late night" → Price intent &nbsp; <strong>5.</strong> "cafe in University City" → Neighborhood</p>
 <div class="demo-frame" id="demo-area">
 <iframe src="/" id="demo-iframe" style="display:none" onload="this.style.display='block';document.getElementById('demo-fallback').style.display='none'"></iframe>
 <div id="demo-fallback" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:40px;text-align:center;background:#fafafa">
