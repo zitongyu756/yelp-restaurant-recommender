@@ -81,12 +81,18 @@ python scripts/run_clustering.py
 ```
 
 ### 3. Launch the Web Interface
-Once the data pipeline is fully run, you can launch the UI:
+Once the data pipeline is fully run, start the FastAPI server (the current
+demo, with the cuisine filter, dynamic reranker weights, and the slide deck):
 
 ```bash
-streamlit run app/streamlit_app.py
+uvicorn app.api:app --reload
 ```
-Open `http://localhost:8501` in your browser.
+
+Open `http://localhost:8000` for the demo and `http://localhost:8000/presentation.html` for the slides.
+
+> Legacy: an older Streamlit UI is still available via
+> `streamlit run app/streamlit_app.py` at `http://localhost:8501`, but it
+> doesn't include the recent reranker, cuisine filter, or vibe labels.
 
 ---
 
