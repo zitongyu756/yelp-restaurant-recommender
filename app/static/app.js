@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const starsValue = document.getElementById('stars-value');
     const priceFilter = document.getElementById('filter-price');
     const hoodFilter = document.getElementById('filter-neighborhood');
+    const cuisineFilter = document.getElementById('filter-cuisine');
     const loadMoreBtn = document.getElementById('load-more-btn');
     const suggestionBtns = document.querySelectorAll('.suggestion-btn');
     
@@ -72,8 +73,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const start = performance.now();
+            // Cuisine filter is a server-side soft penalty — only sent when explicitly chosen
+            const cuisineParam = (cuisineFilter.value !== "any")
+                ? `&cuisine=${encodeURIComponent(cuisineFilter.value)}`
+                : "";
             // Fetch 30 candidates to allow client-side filtering
-            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&top_k=30`);
+            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&top_k=30${cuisineParam}`);
             const data = await response.json();
             const end = performance.now();
             window.fetchTime = end - start;
